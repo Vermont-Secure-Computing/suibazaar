@@ -1,0 +1,10 @@
+/* Keep the application header and wallet menu above page cards */
+.app-header {
+    position: relative;
+    z-index: 1000;
+  }
+  
+  .wallet {
+    position: relative;
+    z-index: 1100;
+  }

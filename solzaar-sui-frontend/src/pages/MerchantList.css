@@ -1,0 +1,141 @@
+.merchant-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 20px;
+  margin-top: 24px;
+}
+
+.merchant-card {
+  border: 1px solid #e5e7eb;
+  border-radius: 16px;
+  padding: 20px;
+  background: white;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  box-shadow: 0 4px 16px rgba(0,0,0,.04);
+}
+
+.merchant-card-header {
+  display: flex;
+  gap: 14px;
+  align-items: center;
+}
+
+.merchant-avatar {
+  width: 54px;
+  height: 54px;
+  border-radius: 50%;
+  background: #eef2ff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  font-size: 22px;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.merchant-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.merchant-name-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.merchant-name-row h3 {
+  margin: 0;
+}
+
+.merchant-verified {
+  font-size: 11px;
+  padding: 3px 7px;
+  border-radius: 20px;
+  background: #ecfdf5;
+}
+
+.merchant-location {
+  display: block;
+  margin-top: 4px;
+  font-size: 13px;
+  opacity: .7;
+}
+
+.merchant-description {
+  line-height: 1.5;
+  min-height: 48px;
+  margin: 0;
+}
+
+.merchant-info {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 13px;
+  opacity: .75;
+}
+
+.merchant-visit-link {
+  display: block;
+  text-align: center;
+  padding: 11px 16px;
+  border-radius: 10px;
+  background: #111827;
+  color: white;
+  text-decoration: none;
+  margin-top: auto;
+}
+
+.merchant-status {
+  padding: 30px 0;
+}
+
+.merchant-error {
+  color: #b91c1c;
+}
+
+@media (max-width: 600px) {
+  .merchant-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .merchant-info {
+    flex-direction: column;
+  }
+}
+
+/* Merchant card text colors */
+.merchant-card {
+  color: #111827;
+}
+
+.merchant-name-row h3 {
+  color: #111827;
+}
+
+.merchant-location {
+  color: #6b7280;
+  opacity: 1;
+}
+
+.merchant-description {
+  color: #374151;
+}
+
+.merchant-info {
+  color: #6b7280;
+  opacity: 1;
+}
+
+.merchant-verified {
+  color: #047857;
+}
+
+.merchant-visit-link {
+  color: #ffffff;
+}

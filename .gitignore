@@ -1,0 +1,32 @@
+# Sui / Move
+build/
+**/build/
+traces/
+**/traces/
+.trace
+.coverage*
+Pub.*.toml
+
+# Frontend / Node
+node_modules/
+**/node_modules/
+dist/
+**/dist/
+
+# Environment
+.env
+.env.*
+!.env.example
+
+# Editor / OS
+.vscode/
+.idea/
+.DS_Store
+
+# Local backups / diagnostics
+*.BACKUP-V1
+*.DIAGNOSTIC
+*.FULL
+*.FULL-BACKUP
+*.FULL-BACKUP2
+*.backup-shared
