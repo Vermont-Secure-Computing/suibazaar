@@ -8,6 +8,7 @@ module solzaar_sui::marketplace {
     use sui::object::{Self, ID, UID};
     use sui::transfer;
     use sui::tx_context::{Self, TxContext};
+    use sui::table::{Self, Table};
 
     use std::option;
 
@@ -37,6 +38,7 @@ module solzaar_sui::marketplace {
     const E_MATH_OVERFLOW: u64 = 17;
     const E_SALE_ALREADY_RECORDED: u64 = 18;
     const E_STOCK_ALREADY_RESTORED: u64 = 19;
+    const E_MERCHANT_ALREADY_EXISTS: u64 = 20;
 
     // ============================================================
     // Limits
@@ -56,6 +58,15 @@ module solzaar_sui::marketplace {
     const MAX_CATEGORY: u64 = 32;
 
     const MAX_BPS: u64 = 10_000;
+
+    // ============================================================
+    // Merchant Registry
+    // ============================================================
+
+    public struct MerchantRegistry has key {
+        id: UID,
+        merchants: Table<address, ID>,
+    }
 
     // ============================================================
     // Merchant
@@ -173,10 +184,24 @@ module solzaar_sui::marketplace {
     }
 
     // ============================================================
+    // Module Initialization
+    // ============================================================
+
+    fun init(ctx: &mut TxContext) {
+        let registry = MerchantRegistry {
+            id: object::new(ctx),
+            merchants: table::new(ctx),
+        };
+
+        transfer::share_object(registry);
+    }
+
+    // ============================================================
     // Create Merchant
     // ============================================================
 
     public fun create_merchant(
+        registry: &mut MerchantRegistry,
         store_name: String,
         description_uri: String,
         logo_uri: String,
@@ -224,6 +249,15 @@ module solzaar_sui::marketplace {
 
         let authority = tx_context::sender(ctx);
 
+        // One wallet/address may create only one merchant.
+        assert!(
+            !table::contains(
+                &registry.merchants,
+                authority
+            ),
+            E_MERCHANT_ALREADY_EXISTS
+        );
+
         let merchant = MerchantProfile {
             id: object::new(ctx),
 
@@ -247,6 +281,13 @@ module solzaar_sui::marketplace {
 
         let merchant_id =
             object::uid_to_inner(&merchant.id);
+
+        // Permanently bind this wallet to its merchant.
+        table::add(
+            &mut registry.merchants,
+            authority,
+            merchant_id,
+        );
 
         event::emit(MerchantCreated {
             merchant_id,
@@ -775,10 +816,7 @@ module solzaar_sui::marketplace {
             total_price,
         });
 
-        transfer::transfer(
-            order,
-            buyer,
-        );
+        transfer::share_object(order);
     }
 
     // ============================================================
@@ -817,6 +855,28 @@ module solzaar_sui::marketplace {
         // Escrow must be completed.
         assert!(
             escrow::status(escrow_object) == 3,
+            E_INVALID_ORDER_STATUS
+        );
+
+        // A completed mutual cancellation is not a sale.
+        //
+        // Mutual cancellation returns each party's full deposit:
+        //   payout_a == deposited_a
+        //   payout_b == deposited_b
+        //   donation == 0
+        //
+        // Do not allow such an escrow to increment sold counters.
+        let is_mutual_cancellation =
+            escrow::proposed_payout_a(escrow_object)
+                == escrow::deposited_a(escrow_object)
+            &&
+            escrow::proposed_payout_b(escrow_object)
+                == escrow::deposited_b(escrow_object)
+            &&
+            escrow::proposed_donation(escrow_object) == 0;
+
+        assert!(
+            !is_mutual_cancellation,
             E_INVALID_ORDER_STATUS
         );
 
@@ -908,6 +968,87 @@ module solzaar_sui::marketplace {
         );
 
         // Cannot restore twice or restore a completed sale.
+        assert!(
+            !order.stock_restored,
+            E_STOCK_ALREADY_RESTORED
+        );
+
+        assert!(
+            !order.completed_sale_recorded,
+            E_INVALID_ORDER_STATUS
+        );
+
+        product.stock =
+            product.stock + order.quantity;
+
+        order.stock_restored = true;
+    }
+
+    // ============================================================
+    // Restore Mutually Cancelled Order Stock
+    // ============================================================
+
+    public fun restore_mutually_cancelled_order_stock(
+        product: &mut Product,
+        order: &mut OrderRecord,
+        escrow_object: &Escrow,
+    ) {
+        assert!(
+            order.escrow == object::id(escrow_object),
+            E_INVALID_ORDER_STATUS
+        );
+
+        assert!(
+            order.product == object::id(product),
+            E_INVALID_ORDER_STATUS
+        );
+
+        assert!(
+            order.seller == product.merchant,
+            E_INVALID_ESCROW_PARTIES
+        );
+
+        // Mutual cancellation uses normal finalization,
+        // therefore the escrow ends as COMPLETED.
+        assert!(
+            escrow::status(escrow_object) == 3,
+            E_INVALID_ORDER_STATUS
+        );
+
+        let party_a =
+            escrow::party_a_address(escrow_object);
+
+        let party_b =
+            escrow::party_b_address(escrow_object);
+
+        assert!(
+            party_a == order.buyer,
+            E_INVALID_ESCROW_PARTIES
+        );
+
+        assert!(
+            party_b == order.seller,
+            E_INVALID_ESCROW_PARTIES
+        );
+
+        // Exact full-refund finalization.
+        assert!(
+            escrow::proposed_payout_a(escrow_object)
+                == escrow::deposited_a(escrow_object),
+            E_INVALID_ORDER_STATUS
+        );
+
+        assert!(
+            escrow::proposed_payout_b(escrow_object)
+                == escrow::deposited_b(escrow_object),
+            E_INVALID_ORDER_STATUS
+        );
+
+        assert!(
+            escrow::proposed_donation(escrow_object) == 0,
+            E_INVALID_ORDER_STATUS
+        );
+
         assert!(
             !order.stock_restored,
             E_STOCK_ALREADY_RESTORED

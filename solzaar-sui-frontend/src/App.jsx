@@ -6,6 +6,8 @@ import CreateMerchant from "./pages/CreateMerchant";
 import CreateProduct from "./pages/CreateProduct";
 import MerchantPage from "./pages/MerchantPage";
 import ProductPage from "./pages/ProductPage";
+import OrdersPage from "./pages/OrdersPage";
+import OrderDetailsPage from "./pages/OrderDetailsPage";
 
 export default function App() {
   return (
@@ -17,6 +19,7 @@ export default function App() {
 
         <nav>
           <Link to="/">Marketplace</Link>
+          <Link to="/orders">Orders</Link>
           <Link to="/merchant/create">Create Merchant</Link>
           <Link to="/product/create">Create Product</Link>
         </nav>
@@ -33,6 +36,11 @@ export default function App() {
         <Route path="/product/create" element={<CreateProduct />} />
         <Route path="/merchant/:id" element={<MerchantPage />} />
         <Route path="/product/:id" element={<ProductPage />} />
+        <Route path="/orders" element={<OrdersPage />} />
+        <Route
+          path="/orders/:role/:escrowAddress"
+          element={<OrderDetailsPage />}
+        />
       </Routes>
     </>
   );

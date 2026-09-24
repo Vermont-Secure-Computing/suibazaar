@@ -2,6 +2,7 @@ import { Transaction } from "@mysten/sui/transactions";
 
 import {
   MARKETPLACE_LATEST_PACKAGE_ID,
+  MERCHANT_REGISTRY_ID,
   MODULE,
   CLOCK_ID,
 } from "../config";
@@ -17,11 +18,18 @@ const need = () => {
 export function createMerchantTx(f) {
   need();
 
+  if (!MERCHANT_REGISTRY_ID) {
+    throw new Error(
+      "Set VITE_MERCHANT_REGISTRY_ID to the Devnet MerchantRegistry object ID."
+    );
+  }
+
   const tx = new Transaction();
 
   tx.moveCall({
     target: `${MARKETPLACE_LATEST_PACKAGE_ID}::${MODULE}::create_merchant`,
     arguments: [
+      tx.object(MERCHANT_REGISTRY_ID),
       tx.pure.string(f.storeName),
       tx.pure.string(f.descriptionUri),
       tx.pure.string(f.logoUri),

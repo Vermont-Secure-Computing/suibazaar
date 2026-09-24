@@ -1,0 +1,305 @@
+.order-detail-page {
+  min-height: 100vh;
+  padding: 32px 20px 60px;
+  background: #f5f7fa;
+  color: #1f2937;
+}
+
+.order-detail-shell {
+  max-width: 1050px;
+  margin: 0 auto;
+}
+
+.order-detail-back {
+  display: inline-block;
+  margin-bottom: 22px;
+  color: #2563eb;
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.order-detail-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 20px;
+  margin-bottom: 24px;
+}
+
+.order-detail-label {
+  font-size: 13px;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: #6b7280;
+}
+
+.order-detail-header h1 {
+  margin: 5px 0;
+  color: #111827;
+}
+
+.order-detail-header p {
+  margin: 0;
+  color: #6b7280;
+}
+
+.order-detail-status {
+  padding: 9px 14px;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.order-detail-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 18px;
+}
+
+.order-detail-card,
+.order-action-card {
+  background: white;
+  border: 1px solid #e5e7eb;
+  border-radius: 14px;
+  padding: 22px;
+}
+
+.order-detail-card h2,
+.order-action-card h2 {
+  margin: 0 0 18px;
+  color: #111827;
+  font-size: 18px;
+}
+
+.order-addresses {
+  grid-column: 1 / -1;
+}
+
+.detail-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 11px 0;
+  border-bottom: 1px solid #f0f1f3;
+}
+
+.detail-row:last-child {
+  border-bottom: 0;
+}
+
+.detail-row span {
+  color: #6b7280;
+}
+
+.detail-row strong {
+  color: #111827;
+  text-align: right;
+}
+
+.order-action-card {
+  margin-top: 18px;
+}
+
+.order-action-card p {
+  color: #4b5563;
+}
+
+.order-primary-button,
+.order-secondary-button,
+.order-danger-button {
+  border: 0;
+  border-radius: 9px;
+  padding: 11px 17px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.order-primary-button {
+  background: #2563eb;
+  color: white;
+}
+
+.order-secondary-button {
+  background: #e5e7eb;
+  color: #1f2937;
+}
+
+.order-danger-button {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.order-primary-button:disabled,
+.order-secondary-button:disabled,
+.order-danger-button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.order-action-buttons {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.donation-field {
+  max-width: 520px;
+  margin: 20px 0;
+  padding: 16px;
+  background: #f8fafc;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+}
+
+.donation-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 15px;
+}
+
+.donation-header > div {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.donation-header strong {
+  color: #111827;
+}
+
+.donation-optional {
+  display: inline-block;
+  padding: 3px 7px;
+  border-radius: 999px;
+  background: #e5e7eb;
+  color: #6b7280;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.donation-value {
+  font-size: 18px;
+}
+
+.donation-help {
+  margin: 7px 0 14px !important;
+  color: #6b7280 !important;
+  font-size: 13px;
+}
+
+.donation-slider {
+  width: 100%;
+  margin: 5px 0 0;
+  cursor: pointer;
+}
+
+.donation-slider:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.donation-range {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 3px;
+  color: #6b7280;
+  font-size: 12px;
+}
+
+.completion-preview {
+  max-width: 500px;
+  margin: 18px 0;
+  padding: 15px;
+  background: #f8fafc;
+  border-radius: 10px;
+}
+
+.completion-preview div {
+  display: flex;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 7px 0;
+}
+
+.completion-preview span {
+  color: #6b7280;
+}
+
+.completion-preview strong {
+  color: #111827;
+}
+
+.order-detail-error {
+  margin: 15px 0;
+  padding: 12px 14px;
+  border-radius: 8px;
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.order-detail-success {
+  margin: 15px 0;
+  padding: 12px 14px;
+  border-radius: 8px;
+  background: #dcfce7;
+  color: #166534;
+  overflow-wrap: anywhere;
+}
+
+.order-completed-message {
+  color: #166534 !important;
+  font-weight: 700;
+}
+
+.status-0 {
+  background: #eef2f7;
+  color: #374151;
+}
+
+.status-1 {
+  background: #e8f7ee;
+  color: #166534;
+}
+
+.status-2 {
+  background: #fff4d8;
+  color: #92400e;
+}
+
+.status-3 {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.status-4 {
+  background: #f3f4f6;
+  color: #52525b;
+}
+
+@media (max-width: 700px) {
+  .order-detail-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .order-addresses {
+    grid-column: auto;
+  }
+
+  .order-detail-header {
+    flex-direction: column;
+  }
+
+  .detail-row {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .detail-row strong {
+    text-align: left;
+    overflow-wrap: anywhere;
+  }
+}

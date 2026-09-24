@@ -1,0 +1,315 @@
+.orders-page {
+  width: min(1180px, calc(100% - 32px));
+  margin: 0 auto;
+  padding: 42px 0 80px;
+}
+
+.orders-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 24px;
+  margin-bottom: 34px;
+}
+
+.orders-header h1 {
+  margin: 0 0 6px;
+  font-size: 2rem;
+}
+
+.orders-header p {
+  margin: 0;
+  opacity: 0.7;
+}
+
+.orders-refresh-button {
+  padding: 11px 18px;
+  border: 1px solid #d7dce5;
+  border-radius: 10px;
+  background: white;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.orders-section {
+  margin-bottom: 42px;
+}
+
+.orders-section h2 {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.orders-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 27px;
+  height: 27px;
+  padding: 0 8px;
+  border-radius: 20px;
+  background: #eef2f7;
+  font-size: 0.8rem;
+}
+
+.orders-controls {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 14px;
+}
+
+.orders-controls label {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 0.85rem;
+}
+
+.orders-controls select {
+  padding: 8px 12px;
+  border: 1px solid #d7dce5;
+  border-radius: 8px;
+  background: white;
+}
+
+.orders-list {
+  display: grid;
+  gap: 10px;
+}
+
+.order-row {
+  width: 100%;
+  display: grid;
+  grid-template-columns:
+    minmax(260px, 1fr)
+    170px
+    210px
+    24px;
+  align-items: center;
+  gap: 20px;
+
+  padding: 16px 18px;
+
+  border: 1px solid #e1e5eb;
+  border-radius: 14px;
+
+  background: white;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.order-row:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.06);
+}
+
+.order-product {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-width: 0;
+}
+
+.order-product img,
+.order-image-placeholder {
+  width: 62px;
+  height: 62px;
+  flex: 0 0 62px;
+  border-radius: 10px;
+  object-fit: cover;
+  background: #f1f3f6;
+}
+
+.order-image-placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.7rem;
+  opacity: 0.6;
+}
+
+.order-product > div:last-child {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.order-product strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.order-product span,
+.order-product small {
+  opacity: 0.65;
+}
+
+.order-value {
+  display: grid;
+  gap: 4px;
+}
+
+.order-value small {
+  opacity: 0.6;
+}
+
+.order-status {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+}
+
+.order-status-badge,
+.order-action-badge {
+  display: inline-flex;
+  padding: 5px 9px;
+  border-radius: 20px;
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+.order-status-badge {
+  background: #eef2f7;
+}
+
+.status-1 {
+  background: #e8f7ee;
+}
+
+.status-2 {
+  background: #fff4d8;
+}
+
+.status-3 {
+  background: #e6f5ec;
+}
+
+.status-4 {
+  background: #f2f2f2;
+}
+
+.order-action-badge {
+  background: #fff0cf;
+}
+
+.order-arrow {
+  font-size: 1.7rem;
+  opacity: 0.4;
+}
+
+.orders-state,
+.orders-empty,
+.orders-error {
+  padding: 22px;
+  border-radius: 12px;
+}
+
+.orders-state,
+.orders-empty {
+  background: #f7f8fa;
+}
+
+.orders-error {
+  margin-bottom: 24px;
+  background: #fff0f0;
+  color: #b42318;
+}
+
+@media (max-width: 760px) {
+  .orders-header {
+    flex-direction: column;
+  }
+
+  .order-row {
+    grid-template-columns: 1fr;
+  }
+
+  .order-arrow {
+    display: none;
+  }
+
+  .order-value,
+  .order-status {
+    margin-left: 76px;
+  }
+}
+
+/* Force readable text inside order cards */
+.order-row {
+  color: #1f2937;
+}
+
+.order-product strong {
+  color: #111827;
+}
+
+.order-product span,
+.order-product small {
+  color: #6b7280;
+  opacity: 1;
+}
+
+.order-value small {
+  color: #6b7280;
+  opacity: 1;
+}
+
+.order-value strong {
+  color: #111827;
+}
+
+.order-status-badge {
+  color: #374151;
+}
+
+.order-action-badge {
+  color: #92400e;
+}
+
+.status-0 {
+  background: #eef2f7;
+  color: #374151;
+}
+
+.status-1 {
+  background: #e8f7ee;
+  color: #166534;
+}
+
+.status-2 {
+  background: #fff4d8;
+  color: #92400e;
+}
+
+.status-3 {
+  background: #e6f5ec;
+  color: #166534;
+}
+
+.status-4 {
+  background: #f2f2f2;
+  color: #52525b;
+}
+
+.order-arrow {
+  color: #6b7280;
+}
+
+.orders-empty,
+.orders-state {
+  background: #f7f8fa;
+  color: #374151;
+}
+
+.orders-empty {
+  border: 1px solid #e5e7eb;
+}
+
+
