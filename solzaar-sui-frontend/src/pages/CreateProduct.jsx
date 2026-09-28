@@ -1,8 +1,5 @@
 import { useEffect, useState } from "react";
-import {
-  useCurrentAccount,
-  useDAppKit,
-} from "@mysten/dapp-kit-react";
+import { useCurrentAccount, useDAppKit } from "@mysten/dapp-kit-react";
 
 import { createProductTx } from "../lib/marketplace";
 import { getMerchantByAuthority } from "../lib/marketplaceData";
@@ -11,9 +8,7 @@ const MAX_IMAGES = 3;
 const MAX_IMAGE_URI_BYTES = 250;
 
 function utf8ByteLength(value) {
-  return new TextEncoder().encode(
-    String(value ?? "")
-  ).length;
+  return new TextEncoder().encode(String(value ?? "")).length;
 }
 
 function FieldCounter({ value, maxBytes }) {
@@ -40,14 +35,11 @@ export default function CreateProduct() {
   const dAppKit = useDAppKit();
 
   const [merchant, setMerchant] = useState(null);
-  const [merchantLoading, setMerchantLoading] =
-    useState(false);
+  const [merchantLoading, setMerchantLoading] = useState(false);
 
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
-  const [imageUris, setImageUris] = useState(
-    Array(MAX_IMAGES).fill("")
-  );
+  const [imageUris, setImageUris] = useState(Array(MAX_IMAGES).fill(""));
   const [category, setCategory] = useState("");
   const [price, setPrice] = useState("");
   const [stock, setStock] = useState("");
@@ -68,25 +60,17 @@ export default function CreateProduct() {
         setMerchantLoading(true);
         setMessage("");
 
-        const result = await getMerchantByAuthority(
-          account.address
-        );
+        const result = await getMerchantByAuthority(account.address);
 
         if (!cancelled) {
           setMerchant(result);
         }
       } catch (error) {
-        console.error(
-          "Failed to load merchant:",
-          error
-        );
+        console.error("Failed to load merchant:", error);
 
         if (!cancelled) {
           setMerchant(null);
-          setMessage(
-            error?.message ||
-              "Failed to load merchant profile."
-          );
+          setMessage(error?.message || "Failed to load merchant profile.");
         }
       } finally {
         if (!cancelled) {
@@ -105,17 +89,12 @@ export default function CreateProduct() {
   const totalContentBytes =
     utf8ByteLength(title) +
     utf8ByteLength(description) +
-    imageUris.reduce(
-      (total, imageUri) =>
-        total + utf8ByteLength(imageUri),
-      0
-    ) +
+    imageUris.reduce((total, imageUri) => total + utf8ByteLength(imageUri), 0) +
     utf8ByteLength(category);
 
   const transactionContentLimit = 500;
 
-  const productTooLarge =
-    totalContentBytes > transactionContentLimit;
+  const productTooLarge = totalContentBytes > transactionContentLimit;
 
   const updateImageUri = (index, value) => {
     setImageUris((current) =>
@@ -132,9 +111,7 @@ export default function CreateProduct() {
     }
 
     if (!merchant) {
-      setMessage(
-        "No active merchant profile found for this wallet."
-      );
+      setMessage("No active merchant profile found for this wallet.");
       return;
     }
 
@@ -169,11 +146,7 @@ export default function CreateProduct() {
     ];
 
     cleanedImageUris.forEach((imageUri, index) => {
-      limits.push([
-        `Image URL ${index + 1}`,
-        imageUri,
-        MAX_IMAGE_URI_BYTES,
-      ]);
+      limits.push([`Image URL ${index + 1}`, imageUri, MAX_IMAGE_URI_BYTES]);
     });
 
     for (const [label, value, maxBytes] of limits) {
@@ -189,15 +162,11 @@ export default function CreateProduct() {
     }
 
     const cleanedTotalBytes = limits.reduce(
-      (total, [, value]) =>
-        total + utf8ByteLength(value),
+      (total, [, value]) => total + utf8ByteLength(value),
       0
     );
 
-    if (
-      cleanedTotalBytes >
-      transactionContentLimit
-    ) {
+    if (cleanedTotalBytes > transactionContentLimit) {
       setMessage(
         `Product information is too large. ` +
           `Current content: ${cleanedTotalBytes} bytes. ` +
@@ -209,21 +178,13 @@ export default function CreateProduct() {
     const priceNumber = Number(price);
     const stockNumber = Number(stock);
 
-    if (
-      !Number.isFinite(priceNumber) ||
-      priceNumber <= 0
-    ) {
+    if (!Number.isFinite(priceNumber) || priceNumber <= 0) {
       setMessage("Enter a valid price in SUI.");
       return;
     }
 
-    if (
-      !Number.isInteger(stockNumber) ||
-      stockNumber < 0
-    ) {
-      setMessage(
-        "Enter a valid whole-number stock quantity."
-      );
+    if (!Number.isInteger(stockNumber) || stockNumber < 0) {
+      setMessage("Enter a valid whole-number stock quantity.");
       return;
     }
 
@@ -254,9 +215,7 @@ export default function CreateProduct() {
     const fraction = parts[1] || "";
 
     if (fraction.length > 9) {
-      setMessage(
-        "SUI price can have at most 9 decimal places."
-      );
+      setMessage("SUI price can have at most 9 decimal places.");
       return;
     }
 
@@ -265,17 +224,13 @@ export default function CreateProduct() {
       BigInt((fraction + "000000000").slice(0, 9));
 
     if (priceMist <= 0n) {
-      setMessage(
-        "Minimum price is 0.000000001 SUI."
-      );
+      setMessage("Minimum price is 0.000000001 SUI.");
       return;
     }
 
     try {
       setSubmitting(true);
-      setMessage(
-        "Waiting for wallet confirmation..."
-      );
+      setMessage("Waiting for wallet confirmation...");
 
       const tx = createProductTx({
         merchantId: merchant.objectId,
@@ -288,44 +243,33 @@ export default function CreateProduct() {
         stock: stockNumber,
       });
 
-      const result =
-        await dAppKit.signAndExecuteTransaction({
-          transaction: tx,
-        });
+      const result = await dAppKit.signAndExecuteTransaction({
+        transaction: tx,
+      });
 
       if (result.FailedTransaction) {
         throw new Error(
-          result.FailedTransaction.status?.error
-            ?.message || "Transaction failed"
+          result.FailedTransaction.status?.error?.message ||
+            "Transaction failed"
         );
       }
 
       const digest = result.Transaction?.digest;
 
       setMessage(
-        digest
-          ? `Product created: ${digest}`
-          : "Product created successfully."
+        digest ? `Product created: ${digest}` : "Product created successfully."
       );
 
       setTitle("");
       setDescription("");
-      setImageUris(
-        Array(MAX_IMAGES).fill("")
-      );
+      setImageUris(Array(MAX_IMAGES).fill(""));
       setCategory("");
       setPrice("");
       setStock("");
     } catch (error) {
-      console.error(
-        "Create product error:",
-        error
-      );
+      console.error("Create product error:", error);
 
-      setMessage(
-        error?.message ||
-          "Failed to create product."
-      );
+      setMessage(error?.message || "Failed to create product.");
     } finally {
       setSubmitting(false);
     }
@@ -337,10 +281,10 @@ export default function CreateProduct() {
         padding: 20,
         maxWidth: 700,
         margin: "0 auto",
-        color: "#111827",
+        color: "#ffffff",
       }}
     >
-      <h2>Create Product</h2>
+      <h2 style={{ color: "#ffffff" }}>Create Product</h2>
 
       {!account && (
         <div
@@ -356,28 +300,23 @@ export default function CreateProduct() {
         </div>
       )}
 
-      {account && merchantLoading && (
-        <p>Loading merchant profile...</p>
-      )}
+      {account && merchantLoading && <p>Loading merchant profile...</p>}
 
-      {account &&
-        !merchantLoading &&
-        !merchant && (
-          <div
-            style={{
-              padding: 14,
-              marginBottom: 20,
-              border: "1px solid #f59e0b",
-              borderRadius: 8,
-              background: "#fffbeb",
-              color: "#92400e",
-            }}
-          >
-            No active merchant profile found for
-            this wallet. Create a merchant profile
-            first.
-          </div>
-        )}
+      {account && !merchantLoading && !merchant && (
+        <div
+          style={{
+            padding: 14,
+            marginBottom: 20,
+            border: "1px solid #f59e0b",
+            borderRadius: 8,
+            background: "#fffbeb",
+            color: "#92400e",
+          }}
+        >
+          No active merchant profile found for this wallet. Create a merchant
+          profile first.
+        </div>
+      )}
 
       {merchant && (
         <div
@@ -389,31 +328,30 @@ export default function CreateProduct() {
             background: "#f9fafb",
           }}
         >
-          <strong>Store:</strong>{" "}
-          {merchant.store_name || "Unnamed Store"}
+          <strong>Store:</strong> {merchant.store_name || "Unnamed Store"}
         </div>
       )}
 
-      <label>Product Name</label>
+      <label>
+        Product Name
+      </label>
       <br />
 
       <input
+        style={{ marginTop: 3 }}
         placeholder="Product Name"
         value={title}
         maxLength={64}
-        onChange={(event) =>
-          setTitle(event.target.value)
-        }
+        onChange={(event) => setTitle(event.target.value)}
       />
 
-      <FieldCounter
-        value={title}
-        maxBytes={64}
-      />
+      <FieldCounter value={title} maxBytes={64} />
 
       <br />
 
-      <label>Product Description</label>
+      <label>
+        Product Description
+      </label>
       <br />
 
       <textarea
@@ -421,9 +359,7 @@ export default function CreateProduct() {
         value={description}
         maxLength={200}
         rows={6}
-        onChange={(event) =>
-          setDescription(event.target.value)
-        }
+        onChange={(event) => setDescription(event.target.value)}
         style={{
           width: "100%",
           maxWidth: 600,
@@ -432,103 +368,82 @@ export default function CreateProduct() {
           resize: "vertical",
           fontFamily: "inherit",
           fontSize: 14,
+          marginTop: 3,
         }}
       />
 
-      <FieldCounter
-        value={description}
-        maxBytes={200}
-      />
+      <FieldCounter value={description} maxBytes={200} />
 
       <br />
 
-      <label>
-        Product Images (optional, up to 3)
-      </label>
+      <label>Product Images (optional, up to 3)</label>
 
       {imageUris.map((imageUri, index) => (
-        <div
-          key={index}
-          style={{ marginTop: 10 }}
-        >
+        <div key={index} style={{ marginTop: 10 }}>
           <input
             placeholder={`Image URL ${index + 1}`}
             value={imageUri}
             maxLength={MAX_IMAGE_URI_BYTES}
-            onChange={(event) =>
-              updateImageUri(
-                index,
-                event.target.value
-              )
-            }
+            onChange={(event) => updateImageUri(index, event.target.value)}
           />
 
-          <FieldCounter
-            value={imageUri}
-            maxBytes={MAX_IMAGE_URI_BYTES}
-          />
+          <FieldCounter value={imageUri} maxBytes={MAX_IMAGE_URI_BYTES} />
         </div>
       ))}
 
       <br />
 
-      <label>Category</label>
+      <label>
+        Category
+      </label>
       <br />
 
       <input
+        style={{ marginTop: 3 }}
         placeholder="Category"
         value={category}
         maxLength={32}
-        onChange={(event) =>
-          setCategory(event.target.value)
-        }
+        onChange={(event) => setCategory(event.target.value)}
       />
 
-      <FieldCounter
-        value={category}
-        maxBytes={32}
-      />
+      <FieldCounter value={category} maxBytes={32} />
 
       <br />
 
-      <label>Price in SUI</label>
+      <label>
+        Price in SUI
+      </label>
       <br />
 
       <input
+        style={{ marginTop: 3 }}
         type="number"
         min="0.000000001"
         step="0.000000001"
         placeholder="Price (SUI)"
         value={price}
-        onChange={(event) =>
-          setPrice(event.target.value)
-        }
+        onChange={(event) => setPrice(event.target.value)}
       />
 
-      <div
-        style={{
-          fontSize: 12,
-          color: "#666",
-          marginTop: 4,
-        }}
-      >
+      <div>
         Minimum price: 0.000000001 SUI
       </div>
 
       <br />
 
-      <label>Available Stock</label>
+      <label>
+        Available Stock
+      </label>
       <br />
 
       <input
+        style={{ marginTop: 3 }}
         type="number"
         min="0"
         step="1"
         placeholder="Available Stock"
         value={stock}
-        onChange={(event) =>
-          setStock(event.target.value)
-        }
+        onChange={(event) => setStock(event.target.value)}
       />
 
       <div
@@ -538,8 +453,7 @@ export default function CreateProduct() {
           marginTop: 4,
         }}
       >
-        Enter a whole number, such as 0, 1, 5,
-        or 100.
+        Enter a whole number, such as 0, 1, 5, or 100.
       </div>
 
       <div
@@ -548,29 +462,17 @@ export default function CreateProduct() {
           marginBottom: 16,
           padding: 12,
           maxWidth: 600,
-          border: productTooLarge
-            ? "1px solid #dc2626"
-            : "1px solid #ddd",
+          border: productTooLarge ? "1px solid #dc2626" : "1px solid #ddd",
           borderRadius: 8,
-          background: productTooLarge
-            ? "#fef2f2"
-            : "#f9fafb",
-          color: productTooLarge
-            ? "#dc2626"
-            : "#333",
+          background: productTooLarge ? "#fef2f2" : "#f9fafb",
+          color: productTooLarge ? "#dc2626" : "#333",
         }}
       >
-        <strong>
-          Combined product content:
-        </strong>{" "}
-        {totalContentBytes}/
-        {transactionContentLimit} recommended
-        bytes
-
+        <strong>Combined product content:</strong> {totalContentBytes}/
+        {transactionContentLimit} recommended bytes
         {productTooLarge && (
           <div style={{ marginTop: 6 }}>
-            Shorten the product description,
-            image URL, or other fields before
+            Shorten the product description, image URL, or other fields before
             creating the product.
           </div>
         )}
@@ -587,9 +489,7 @@ export default function CreateProduct() {
           merchantLoading
         }
       >
-        {submitting
-          ? "Creating..."
-          : "Create Product"}
+        {submitting ? "Creating..." : "Create Product"}
       </button>
 
       {message && (

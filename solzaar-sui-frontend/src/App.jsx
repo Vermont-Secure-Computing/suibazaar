@@ -1,5 +1,5 @@
 import { Routes, Route, Link } from "react-router-dom";
-import { ConnectButton } from "@mysten/dapp-kit-react/ui";
+import WalletButton from "./components/WalletButton";
 
 import Home from "./pages/Home";
 import CreateMerchant from "./pages/CreateMerchant";
@@ -26,7 +26,7 @@ export default function App() {
 
         <div className="wallet">
           <span>Sui Devnet</span>
-          <ConnectButton />
+          <WalletButton />
         </div>
       </header>
 
