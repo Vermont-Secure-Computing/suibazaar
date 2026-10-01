@@ -303,3 +303,131 @@
     overflow-wrap: anywhere;
   }
 }
+
+/* =========================================================
+   Product Review
+   ========================================================= */
+
+   .order-review-panel {
+    max-width: 620px;
+    margin-top: 22px;
+    padding: 22px;
+    border: 1px solid #e5e7eb;
+    border-radius: 12px;
+    background: #f8fafc;
+  }
+  
+  .order-review-heading h3 {
+    margin: 0;
+    color: #111827;
+    font-size: 18px;
+  }
+  
+  .order-review-heading p {
+    margin: 6px 0 0;
+    color: #6b7280;
+    font-size: 14px;
+  }
+  
+  .order-review-rating {
+    margin-top: 20px;
+  }
+  
+  .order-review-label {
+    display: block;
+    margin-bottom: 7px;
+    color: #374151;
+    font-size: 14px;
+    font-weight: 700;
+  }
+  
+  .order-review-stars {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+  
+  .order-review-star {
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: #d1d5db;
+    font-size: 34px;
+    line-height: 1;
+    cursor: pointer;
+    transition:
+      color .15s ease,
+      transform .15s ease;
+  }
+  
+  .order-review-star:hover {
+    transform: scale(1.08);
+  }
+  
+  .order-review-star.selected {
+    color: #f5a623;
+  }
+  
+  .order-review-star:disabled {
+    cursor: not-allowed;
+    opacity: .6;
+  }
+  
+  .order-review-rating-text {
+    display: block;
+    margin-top: 7px;
+    color: #374151;
+    font-size: 13px;
+  }
+  
+  .order-review-comment {
+    margin: 20px 0;
+  }
+  
+  .order-review-comment label {
+    display: block;
+    margin-bottom: 7px;
+    color: #374151;
+    font-size: 14px;
+    font-weight: 700;
+  }
+  
+  .order-review-comment textarea {
+    box-sizing: border-box;
+    width: 100%;
+    resize: vertical;
+    padding: 11px 12px;
+    border: 1px solid #d1d5db;
+    border-radius: 9px;
+    background: #ffffff;
+    color: #111827;
+    font: inherit;
+  }
+  
+  .order-review-comment textarea:focus {
+    outline: 2px solid #bfdbfe;
+    border-color: #2563eb;
+  }
+  
+  .order-review-counter {
+    margin-top: 5px;
+    text-align: right;
+    color: #6b7280;
+    font-size: 12px;
+  }
+  
+  .order-reviewed-message {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    max-width: 620px;
+    margin-top: 20px;
+    padding: 16px;
+    border-radius: 10px;
+    background: #dcfce7;
+    color: #166534;
+  }
+  
+  .order-reviewed-message span {
+    font-size: 14px;
+  }

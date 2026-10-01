@@ -5,6 +5,7 @@ import {
   getProduct,
   getMerchantByAuthority,
   getEscrowCreatedByDigest,
+  getProductReviews,
 } from "../lib/marketplaceData";
 
 import { useCurrentAccount, useDAppKit } from "@mysten/dapp-kit-react";
@@ -40,6 +41,7 @@ export default function ProductPage() {
 
   const [product, setProduct] = useState(null);
   const [merchant, setMerchant] = useState(null);
+  const [reviews, setReviews] = useState([]);
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -68,6 +70,12 @@ export default function ProductPage() {
         if (cancelled) return;
 
         setProduct(item);
+
+        const productReviews = await getProductReviews(item.objectId);
+
+        if (!cancelled) {
+          setReviews(productReviews);
+        }
 
         if (item.merchant) {
           const seller = await getMerchantByAuthority(item.merchant);
@@ -139,6 +147,44 @@ export default function ProductPage() {
   const availableStock = Number(product.stock ?? 0);
 
   const soldCount = Number(product.sold ?? 0);
+
+  const reviewCount = reviews.length;
+
+  const reviewRatingTotal = reviews.reduce(
+    (total, review) => total + Number(review.rating ?? 0),
+    0
+  );
+
+  const averageReviewRating =
+    reviewCount > 0 ? reviewRatingTotal / reviewCount : 0;
+
+  function renderReviewStars(rating) {
+    const value = Number(rating ?? 0);
+
+    return [1, 2, 3, 4, 5].map((star) => (star <= value ? "★" : "☆")).join("");
+  }
+
+  function shortAddress(address) {
+    if (!address) return "Unknown buyer";
+
+    if (address.length <= 14) {
+      return address;
+    }
+
+    return `${address.slice(0, 6)}...${address.slice(-4)}`;
+  }
+
+  function formatReviewDate(timestamp) {
+    if (!timestamp) return "";
+
+    const numericTimestamp = Number(timestamp);
+
+    if (!Number.isFinite(numericTimestamp)) {
+      return "";
+    }
+
+    return new Date(numericTimestamp).toLocaleDateString();
+  }
 
   const safeQuantity = Math.max(
     1,
@@ -429,7 +475,18 @@ export default function ProductPage() {
 
             <h1 className="product-title">{product.title}</h1>
 
-            <div className="product-sub-info">{soldCount} sold</div>
+            <div className="product-sub-info">
+              {soldCount} sold
+              {reviewCount > 0 && (
+                <>
+                  {" · "}
+                  <span className="product-rating-stars">★</span>{" "}
+                  <strong>{averageReviewRating.toFixed(1)}</strong>
+                  {" · "}
+                  {reviewCount} {reviewCount === 1 ? "review" : "reviews"}
+                </>
+              )}
+            </div>
 
             <h2 className="product-detail-price">
               {formatSui(product.price)} SUI
@@ -600,6 +657,71 @@ export default function ProductPage() {
             )}
           </section>
         </div>
+        <section className="product-detail-card product-section product-reviews-section">
+          <div className="product-reviews-header">
+            <div>
+              <h2>Customer Reviews</h2>
+
+              {reviewCount > 0 && (
+                <div className="product-reviews-summary">
+                  <span className="product-reviews-summary-stars">
+                    {renderReviewStars(Math.round(averageReviewRating))}
+                  </span>
+
+                  <strong>{averageReviewRating.toFixed(1)}</strong>
+
+                  <span>
+                    {reviewCount} {reviewCount === 1 ? "review" : "reviews"}
+                  </span>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {reviewCount === 0 ? (
+            <div className="product-no-reviews">
+              <div className="product-no-reviews-stars">☆☆☆☆☆</div>
+
+              <strong>No reviews yet</strong>
+
+              <p>Reviews from verified purchases will appear here.</p>
+            </div>
+          ) : (
+            <div className="product-review-list">
+              {reviews.map((review) => (
+                <article key={review.objectId} className="product-review-item">
+                  <div className="product-review-top">
+                    <div>
+                      <div className="product-review-stars">
+                        {renderReviewStars(Number(review.rating))}
+                      </div>
+
+                      <strong className="product-review-score">
+                        {Number(review.rating)} / 5
+                      </strong>
+                    </div>
+
+                    <span className="product-review-verified">
+                      ✓ Verified Purchase
+                    </span>
+                  </div>
+
+                  {review.comment && (
+                    <p className="product-review-text">{review.comment}</p>
+                  )}
+
+                  <div className="product-review-meta">
+                    <span>Buyer {shortAddress(review.reviewer)}</span>
+
+                    {review.created_at && (
+                      <span>{formatReviewDate(review.created_at)}</span>
+                    )}
+                  </div>
+                </article>
+              ))}
+            </div>
+          )}
+        </section>
       </div>
     </main>
   );

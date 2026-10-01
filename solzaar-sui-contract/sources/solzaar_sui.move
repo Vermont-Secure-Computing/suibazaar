@@ -39,6 +39,13 @@ module solzaar_sui::marketplace {
     const E_SALE_ALREADY_RECORDED: u64 = 18;
     const E_STOCK_ALREADY_RESTORED: u64 = 19;
     const E_MERCHANT_ALREADY_EXISTS: u64 = 20;
+    const E_INVALID_RATING: u64 = 21;
+    const E_REVIEW_TOO_LONG: u64 = 22;
+    const E_ORDER_NOT_COMPLETED: u64 = 23;
+    const E_ONLY_BUYER_CAN_REVIEW: u64 = 24;
+    const E_INVALID_REVIEW_PRODUCT: u64 = 25;
+    const E_INVALID_REVIEW_MERCHANT: u64 = 26;
+    const E_ORDER_ALREADY_REVIEWED: u64 = 27;
 
     // ============================================================
     // Limits
@@ -58,6 +65,7 @@ module solzaar_sui::marketplace {
     const MAX_CATEGORY: u64 = 32;
 
     const MAX_BPS: u64 = 10_000;
+    const MAX_REVIEW_COMMENT: u64 = 280;
 
     // ============================================================
     // Merchant Registry
@@ -135,9 +143,46 @@ module solzaar_sui::marketplace {
 
         completed_sale_recorded: bool,
         stock_restored: bool,
+        reviewed: bool,
 
         created_at: u64,
     }
+
+    // ============================================================
+    // Reviews / Reputation
+    // ============================================================
+
+    public struct MerchantReputation has key {
+        id: UID,
+
+        merchant: address,
+
+        total_reviews: u64,
+        total_rating: u64,
+
+        five_star: u64,
+        four_star: u64,
+        three_star: u64,
+        two_star: u64,
+        one_star: u64,
+    }
+
+    public struct ProductReview has key {
+        id: UID,
+
+        order: ID,
+        escrow: ID,
+        product: ID,
+
+        merchant: address,
+        reviewer: address,
+
+        rating: u8,
+        comment: String,
+
+        created_at: u64,
+    }
+
 
     // ============================================================
     // Events
@@ -183,11 +228,38 @@ module solzaar_sui::marketplace {
         total_price: u64,
     }
 
+    public struct ReputationCreated has copy, drop {
+        reputation_id: ID,
+        merchant: address,
+    }
+
+    public struct ReviewCreated has copy, drop {
+        review_id: ID,
+        order_id: ID,
+        escrow_id: ID,
+        product_id: ID,
+        merchant: address,
+        reviewer: address,
+        rating: u8,
+    }
+
     // ============================================================
     // Module Initialization
     // ============================================================
 
     fun init(ctx: &mut TxContext) {
+        let registry = MerchantRegistry {
+            id: object::new(ctx),
+            merchants: table::new(ctx),
+        };
+
+        transfer::share_object(registry);
+    }
+
+    #[test_only]
+    public fun create_registry_for_testing(
+        ctx: &mut TxContext,
+    ) {
         let registry = MerchantRegistry {
             id: object::new(ctx),
             merchants: table::new(ctx),
@@ -282,6 +354,24 @@ module solzaar_sui::marketplace {
         let merchant_id =
             object::uid_to_inner(&merchant.id);
 
+        let reputation = MerchantReputation {
+            id: object::new(ctx),
+
+            merchant: authority,
+
+            total_reviews: 0,
+            total_rating: 0,
+
+            five_star: 0,
+            four_star: 0,
+            three_star: 0,
+            two_star: 0,
+            one_star: 0,
+        };
+
+        let reputation_id =
+            object::uid_to_inner(&reputation.id);
+
         // Permanently bind this wallet to its merchant.
         table::add(
             &mut registry.merchants,
@@ -294,7 +384,13 @@ module solzaar_sui::marketplace {
             authority,
         });
 
+        event::emit(ReputationCreated {
+            reputation_id,
+            merchant: authority,
+        });
+
         transfer::share_object(merchant);
+        transfer::share_object(reputation);
     }
 
     // ============================================================
@@ -658,23 +754,16 @@ module solzaar_sui::marketplace {
         let quantity_u64 = quantity as u64;
 
         let total_price =
-            product.price * quantity_u64;
-
-        assert!(
-            quantity_u64 == 0 ||
-                total_price / quantity_u64 == product.price,
-            E_MATH_OVERFLOW
-        );
+            checked_mul(
+                product.price,
+                quantity_u64
+            );
 
         let deposit_numerator =
-            total_price * (merchant.seller_deposit_bps as u64);
-
-        assert!(
-            total_price == 0 ||
-                deposit_numerator / total_price ==
-                    (merchant.seller_deposit_bps as u64),
-            E_MATH_OVERFLOW
-        );
+            checked_mul(
+                total_price,
+                merchant.seller_deposit_bps as u64
+            );
 
         let mut security_deposit =
             deposit_numerator / 10_000;
@@ -686,12 +775,10 @@ module solzaar_sui::marketplace {
         };
 
         let expected_buyer_deposit =
-            total_price + security_deposit;
-
-        assert!(
-            expected_buyer_deposit >= total_price,
-            E_MATH_OVERFLOW
-        );
+            checked_add_u64(
+                total_price,
+                security_deposit
+            );
 
         // --------------------------------------------------------
         // Escrow validation
@@ -792,6 +879,7 @@ module solzaar_sui::marketplace {
 
             completed_sale_recorded: false,
             stock_restored: false,
+            reviewed: false,
 
             created_at:
                 clock::timestamp_ms(clock),
@@ -910,10 +998,16 @@ module solzaar_sui::marketplace {
 
         // Record sale.
         product.sold =
-            product.sold + order.quantity;
+            checked_add_u32(
+                product.sold,
+                order.quantity
+            );
 
         merchant.total_sold =
-            merchant.total_sold + order.quantity;
+            checked_add_u32(
+                merchant.total_sold,
+                order.quantity
+            );
 
         order.completed_sale_recorded = true;
     }
@@ -979,8 +1073,10 @@ module solzaar_sui::marketplace {
         );
 
         product.stock =
-            product.stock + order.quantity;
-
+            checked_add_u32(
+                product.stock,
+                order.quantity
+            );
         order.stock_restored = true;
     }
 
@@ -1060,8 +1156,10 @@ module solzaar_sui::marketplace {
         );
 
         product.stock =
-            product.stock + order.quantity;
-
+            checked_add_u32(
+                product.stock,
+                order.quantity
+            );
         order.stock_restored = true;
     }
 
@@ -1107,7 +1205,184 @@ module solzaar_sui::marketplace {
         };
 
         false
-}
+    }
+
+    // ============================================================
+    // Submit Product Review
+    // ============================================================
+
+    public fun submit_review(
+        merchant: &MerchantProfile,
+        product: &Product,
+        order: &mut OrderRecord,
+        escrow_object: &Escrow,
+        reputation: &mut MerchantReputation,
+        rating: u8,
+        comment: String,
+        clock: &Clock,
+        ctx: &mut TxContext,
+    ) {
+        let reviewer = tx_context::sender(ctx);
+
+        // Rating must be 1-5.
+        assert!(
+            rating >= 1 && rating <= 5,
+            E_INVALID_RATING
+        );
+
+        // Comment max 280 bytes.
+        assert!(
+            comment.length() <= MAX_REVIEW_COMMENT,
+            E_REVIEW_TOO_LONG
+        );
+
+        // Must be the buyer.
+        assert!(
+            reviewer == order.buyer,
+            E_ONLY_BUYER_CAN_REVIEW
+        );
+
+        // Order must belong to this escrow.
+        assert!(
+            order.escrow == object::id(escrow_object),
+            E_INVALID_ORDER_STATUS
+        );
+
+        // Order must belong to this product.
+        assert!(
+            order.product == object::id(product),
+            E_INVALID_REVIEW_PRODUCT
+        );
+
+        // Product/order/merchant must agree on seller.
+        assert!(
+            order.seller == product.merchant,
+            E_INVALID_REVIEW_MERCHANT
+        );
+
+        assert!(
+            merchant.authority == order.seller,
+            E_INVALID_REVIEW_MERCHANT
+        );
+
+        assert!(
+            reputation.merchant == order.seller,
+            E_INVALID_REVIEW_MERCHANT
+        );
+
+        // This must be a genuine completed sale.
+        //
+        // record_completed_sale() is deliberately required instead
+        // of checking only escrow status == 3. A mutual cancellation
+        // can also end with escrow status 3.
+        assert!(
+            order.completed_sale_recorded,
+            E_ORDER_NOT_COMPLETED
+        );
+
+        assert!(
+            !order.stock_restored,
+            E_ORDER_NOT_COMPLETED
+        );
+
+        // Defense in depth: escrow itself must also be completed.
+        assert!(
+            escrow::status(escrow_object) == 3,
+            E_ORDER_NOT_COMPLETED
+        );
+
+        // One review per order.
+        assert!(
+            !order.reviewed,
+            E_ORDER_ALREADY_REVIEWED
+        );
+
+        let review = ProductReview {
+            id: object::new(ctx),
+
+            order: object::id(order),
+            escrow: object::id(escrow_object),
+            product: object::id(product),
+
+            merchant: order.seller,
+            reviewer,
+
+            rating,
+            comment,
+
+            created_at: clock::timestamp_ms(clock),
+        };
+
+        reputation.total_reviews =
+            reputation.total_reviews + 1;
+
+        reputation.total_rating =
+            reputation.total_rating + (rating as u64);
+
+        if (rating == 5) {
+            reputation.five_star =
+                reputation.five_star + 1;
+        } else if (rating == 4) {
+            reputation.four_star =
+                reputation.four_star + 1;
+        } else if (rating == 3) {
+            reputation.three_star =
+                reputation.three_star + 1;
+        } else if (rating == 2) {
+            reputation.two_star =
+                reputation.two_star + 1;
+        } else {
+            reputation.one_star =
+                reputation.one_star + 1;
+        };
+
+        order.reviewed = true;
+
+        let review_id = object::id(&review);
+
+        event::emit(ReviewCreated {
+            review_id,
+            order_id: object::id(order),
+            escrow_id: object::id(escrow_object),
+            product_id: object::id(product),
+            merchant: order.seller,
+            reviewer,
+            rating,
+        });
+
+        transfer::share_object(review);
+    }
+
+    fun checked_mul(a: u64, b: u64): u64 {
+        if (a == 0 || b == 0) {
+            return 0
+        };
+
+        assert!(
+            a <= 18446744073709551615 / b,
+            E_MATH_OVERFLOW
+        );
+
+        a * b
+    }
+
+    fun checked_add_u64(a: u64, b: u64): u64 {
+        assert!(
+            a <= 18446744073709551615 - b,
+            E_MATH_OVERFLOW
+        );
+
+        a + b
+    }
+
+    fun checked_add_u32(a: u32, b: u32): u32 {
+        assert!(
+            a <= 4294967295 - b,
+            E_MATH_OVERFLOW
+        );
+
+        a + b
+    }
 
     // ============================================================
     // Read Helpers
@@ -1203,5 +1478,59 @@ module solzaar_sui::marketplace {
         order: &OrderRecord,
     ): bool {
         order.stock_restored
+    }
+
+    public fun order_reviewed(
+        order: &OrderRecord,
+    ): bool {
+        order.reviewed
+    }
+
+    public fun reputation_merchant(
+        reputation: &MerchantReputation,
+    ): address {
+        reputation.merchant
+    }
+
+    public fun reputation_total_reviews(
+        reputation: &MerchantReputation,
+    ): u64 {
+        reputation.total_reviews
+    }
+
+    public fun reputation_total_rating(
+        reputation: &MerchantReputation,
+    ): u64 {
+        reputation.total_rating
+    }
+
+    public fun reputation_five_star(
+        reputation: &MerchantReputation,
+    ): u64 {
+        reputation.five_star
+    }
+
+    public fun reputation_four_star(
+        reputation: &MerchantReputation,
+    ): u64 {
+        reputation.four_star
+    }
+
+    public fun reputation_three_star(
+        reputation: &MerchantReputation,
+    ): u64 {
+        reputation.three_star
+    }
+
+    public fun reputation_two_star(
+        reputation: &MerchantReputation,
+    ): u64 {
+        reputation.two_star
+    }
+
+    public fun reputation_one_star(
+        reputation: &MerchantReputation,
+    ): u64 {
+        reputation.one_star
     }
 }

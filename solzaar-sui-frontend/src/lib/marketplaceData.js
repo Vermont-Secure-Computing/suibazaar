@@ -333,3 +333,124 @@ export async function getOrderRecordByEscrow(escrowId) {
 
   return orders.find((order) => order.escrow?.toLowerCase() === target) ?? null;
 }
+
+const REPUTATION_EVENT =
+  `${MARKETPLACE_PACKAGE_ID}::${MODULE}::ReputationCreated`;
+
+export async function getMerchantReputation(merchantAddress) {
+  if (!merchantAddress) return null;
+
+  const target = merchantAddress.toLowerCase();
+
+  let page = await client.listEvents({
+    filter: {
+      eventType: REPUTATION_EVENT,
+    },
+    order: "descending",
+    limit: 50,
+  });
+
+  while (true) {
+    for (const event of page.events ?? []) {
+      const data = event.json;
+
+      if (
+        data?.merchant?.toLowerCase() === target &&
+        data?.reputation_id
+      ) {
+        const result = await client.getObject({
+          objectId: data.reputation_id,
+          include: {
+            json: true,
+          },
+        });
+
+        if (!result?.object) {
+          return null;
+        }
+
+        return {
+          objectId: result.object.objectId,
+          ...result.object.json,
+        };
+      }
+    }
+
+    if (!page.hasNextPage || !page.endCursor) {
+      break;
+    }
+
+    page = await client.listEvents({
+      filter: {
+        eventType: REPUTATION_EVENT,
+      },
+      before: page.endCursor,
+      limit: 50,
+    });
+  }
+
+  return null;
+}
+
+const REVIEW_EVENT =
+  `${MARKETPLACE_PACKAGE_ID}::${MODULE}::ReviewCreated`;
+
+export async function getProductReviews(productId) {
+  if (!productId) return [];
+
+  const target = productId.toLowerCase();
+  const reviewIds = new Set();
+
+  let page = await client.listEvents({
+    filter: {
+      eventType: REVIEW_EVENT,
+    },
+    order: "descending",
+    limit: 50,
+  });
+
+  while (true) {
+    for (const event of page.events ?? []) {
+      const data = event.json;
+
+      if (
+        data?.product_id?.toLowerCase() === target &&
+        data?.review_id
+      ) {
+        reviewIds.add(data.review_id);
+      }
+    }
+
+    if (!page.hasNextPage || !page.endCursor) {
+      break;
+    }
+
+    page = await client.listEvents({
+      filter: {
+        eventType: REVIEW_EVENT,
+      },
+      before: page.endCursor,
+      limit: 50,
+    });
+  }
+
+  const ids = [...reviewIds];
+
+  if (ids.length === 0) {
+    return [];
+  }
+
+  const result = await client.getObjects({
+    objectIds: ids,
+    include: {
+      json: true,
+    },
+  });
+
+  return (result.objects ?? [])
+    .filter((object) => !(object instanceof Error))
+    .map((object) => ({
+      objectId: object.objectId,
+      ...object.json,
+    }));
+}

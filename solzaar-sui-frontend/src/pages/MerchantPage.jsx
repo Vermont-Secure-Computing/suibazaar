@@ -1,6 +1,11 @@
 import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { getMerchant, getProductsByMerchant } from "../lib/marketplaceData";
+import {
+  getMerchant,
+  getProductsByMerchant,
+  getMerchantReputation,
+  getProductReviews,
+} from "../lib/marketplaceData";
 import "./MerchantPage.css";
 
 export default function MerchantPage() {
@@ -8,6 +13,8 @@ export default function MerchantPage() {
 
   const [merchant, setMerchant] = useState(null);
   const [products, setProducts] = useState([]);
+  const [reputation, setReputation] = useState(null);
+  const [productReviews, setProductReviews] = useState({});
   const [productsLoading, setProductsLoading] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -27,11 +34,38 @@ export default function MerchantPage() {
         setMerchant(result);
         setProductsLoading(true);
 
-        const merchantProducts = await getProductsByMerchant(result.authority);
+        const [merchantProducts, merchantReputation] = await Promise.all([
+          getProductsByMerchant(result.authority),
+          getMerchantReputation(result.authority),
+        ]);
 
         console.log("MERCHANT PRODUCTS:", merchantProducts);
+        console.log("MERCHANT REPUTATION:", merchantReputation);
+
+        const reviewEntries = await Promise.all(
+          merchantProducts.map(async (product) => {
+            try {
+              const reviews = await getProductReviews(product.objectId);
+
+              return [product.objectId, reviews];
+            } catch (error) {
+              console.error(
+                `Failed to load reviews for product ${product.objectId}:`,
+                error
+              );
+
+              return [product.objectId, []];
+            }
+          })
+        );
+
+        const reviewsByProduct = Object.fromEntries(reviewEntries);
+
+        console.log("PRODUCT REVIEWS:", reviewsByProduct);
 
         setProducts(merchantProducts);
+        setReputation(merchantReputation);
+        setProductReviews(reviewsByProduct);
         setProductsLoading(false);
       } catch (err) {
         console.error(err);
@@ -77,6 +111,39 @@ export default function MerchantPage() {
   const initial = (merchant.store_name || "S").slice(0, 1).toUpperCase();
 
   const sellerDeposit = Number(merchant.seller_deposit_bps ?? 0) / 100;
+  const totalReviews = Number(reputation?.total_reviews ?? 0);
+  const totalRating = Number(reputation?.total_rating ?? 0);
+
+  const averageRating = totalReviews > 0 ? totalRating / totalReviews : 0;
+
+  const ratingCounts = [
+    {
+      stars: 5,
+      count: Number(reputation?.five_star ?? 0),
+    },
+    {
+      stars: 4,
+      count: Number(reputation?.four_star ?? 0),
+    },
+    {
+      stars: 3,
+      count: Number(reputation?.three_star ?? 0),
+    },
+    {
+      stars: 2,
+      count: Number(reputation?.two_star ?? 0),
+    },
+    {
+      stars: 1,
+      count: Number(reputation?.one_star ?? 0),
+    },
+  ];
+
+  function renderStars(rating) {
+    return Array.from({ length: 5 }, (_, index) =>
+      index < Math.round(rating) ? "★" : "☆"
+    ).join("");
+  }
 
   return (
     <main className="merchant-page">
@@ -120,6 +187,23 @@ export default function MerchantPage() {
                 )}
               </div>
 
+              <div className="merchant-rating-summary">
+                <span className="merchant-rating-stars">
+                  {renderStars(averageRating)}
+                </span>
+
+                {totalReviews > 0 ? (
+                  <>
+                    <strong>{averageRating.toFixed(1)}</strong>
+                    <span>
+                      {totalReviews} {totalReviews === 1 ? "review" : "reviews"}
+                    </span>
+                  </>
+                ) : (
+                  <span>No reviews yet</span>
+                )}
+              </div>
+
               <p>
                 Ships from{" "}
                 <strong>{merchant.ships_from || "Not specified"}</strong>
@@ -157,6 +241,56 @@ export default function MerchantPage() {
         </div>
       </section>
 
+      <section className="merchant-reputation">
+        <div className="merchant-reputation-heading">
+          <div>
+            <h2>Seller Reputation</h2>
+            <p>Ratings from completed purchases</p>
+          </div>
+
+          <div className="merchant-reputation-score">
+            {totalReviews > 0 ? (
+              <>
+                <strong>{averageRating.toFixed(1)}</strong>
+                <span className="merchant-reputation-main-stars">
+                  {renderStars(averageRating)}
+                </span>
+                <span>
+                  {totalReviews} {totalReviews === 1 ? "review" : "reviews"}
+                </span>
+              </>
+            ) : (
+              <>
+                <span className="merchant-reputation-main-stars">☆☆☆☆☆</span>
+                <span>No reviews yet</span>
+              </>
+            )}
+          </div>
+        </div>
+
+        <div className="merchant-rating-breakdown">
+          {ratingCounts.map(({ stars, count }) => {
+            const percentage =
+              totalReviews > 0 ? (count / totalReviews) * 100 : 0;
+
+            return (
+              <div className="merchant-rating-row" key={stars}>
+                <span className="merchant-rating-label">{stars} ★</span>
+
+                <div className="merchant-rating-bar">
+                  <div
+                    className="merchant-rating-bar-fill"
+                    style={{ width: `${percentage}%` }}
+                  />
+                </div>
+
+                <span className="merchant-rating-count">{count}</span>
+              </div>
+            );
+          })}
+        </div>
+      </section>
+
       <section className="merchant-products">
         <div className="merchant-products-heading">
           <div>
@@ -175,6 +309,20 @@ export default function MerchantPage() {
               const priceSui = Number(product.price ?? 0) / 1_000_000_000;
 
               const image = product.image_uris?.[0] || "";
+
+              const reviews = productReviews[product.objectId] ?? [];
+
+              const productReviewCount = reviews.length;
+
+              const productRatingTotal = reviews.reduce(
+                (total, review) => total + Number(review.rating ?? 0),
+                0
+              );
+
+              const productAverageRating =
+                productReviewCount > 0
+                  ? productRatingTotal / productReviewCount
+                  : 0;
 
               return (
                 <article className="product-card" key={product.objectId}>
@@ -204,6 +352,27 @@ export default function MerchantPage() {
 
                     <div className="product-stock">
                       {Number(product.stock ?? 0)} in stock
+                    </div>
+
+                    <div className="merchant-product-rating">
+                      <span className="merchant-product-rating-stars">
+                        {productReviewCount > 0
+                          ? renderStars(productAverageRating)
+                          : "☆☆☆☆☆"}
+                      </span>
+
+                      {productReviewCount > 0 ? (
+                        <>
+                          <strong>{productAverageRating.toFixed(1)}</strong>
+
+                          <span>
+                            {productReviewCount}{" "}
+                            {productReviewCount === 1 ? "review" : "reviews"}
+                          </span>
+                        </>
+                      ) : (
+                        <span>No reviews yet</span>
+                      )}
                     </div>
 
                     <Link

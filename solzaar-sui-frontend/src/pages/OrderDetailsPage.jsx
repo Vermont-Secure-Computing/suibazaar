@@ -9,7 +9,9 @@ import {
   getOrderRecordByEscrow,
   getProduct,
   getMerchantByAuthority,
+  getMerchantReputation,
 } from "../lib/marketplaceData";
+import { submitReviewTx } from "../lib/marketplace";
 
 import {
   ESCROW_STATUS,
@@ -68,6 +70,10 @@ export default function OrderDetailsPage() {
   const [escrow, setEscrow] = useState(null);
   const [product, setProduct] = useState(null);
   const [merchant, setMerchant] = useState(null);
+  const [reputation, setReputation] = useState(null);
+
+  const [reviewRating, setReviewRating] = useState(0);
+  const [reviewComment, setReviewComment] = useState("");
 
   const [loading, setLoading] = useState(true);
   const [processing, setProcessing] = useState(false);
@@ -94,7 +100,6 @@ export default function OrderDetailsPage() {
 
       const orderData = await getOrderRecordByEscrow(escrowAddress);
 
-
       if (!orderData) {
         throw new Error("Marketplace order record was not found.");
       }
@@ -103,10 +108,15 @@ export default function OrderDetailsPage() {
 
       const merchantData = await getMerchantByAuthority(orderData.seller);
 
+      const reputationData = await getMerchantReputation(orderData.seller);
+
+      console.log("ORDER REPUTATION:", reputationData);
+
       setEscrow(escrowData);
       setOrder(orderData);
       setProduct(productData);
       setMerchant(merchantData);
+      setReputation(reputationData);
     } catch (err) {
       console.error("Load order details error:", err);
 
@@ -238,6 +248,14 @@ export default function OrderDetailsPage() {
 
   const mutualCancellationCompleted = isCompletedMutualCancellation(escrow);
 
+  const canBuyerReview =
+    isBuyer &&
+    status === ESCROW_STATUS.COMPLETED &&
+    !mutualCancellationCompleted &&
+    order.completed_sale_recorded === true &&
+    order.stock_restored !== true &&
+    order.reviewed !== true;
+
   const cancellationReasonText = getMutualCancellationReason(escrow);
 
   const canRequestMutualCancellation =
@@ -262,6 +280,69 @@ export default function OrderDetailsPage() {
     isFinalizationPending &&
     !mutualCancellationPending &&
     proposer === seller;
+
+  async function submitReview() {
+    if (!canBuyerReview) {
+      setError("This order is not eligible for a review.");
+      return;
+    }
+
+    if (!merchant?.objectId) {
+      setError("Seller merchant profile was not found.");
+      return;
+    }
+
+    if (!product?.objectId) {
+      setError("Product was not found.");
+      return;
+    }
+
+    if (!reputation?.objectId) {
+      setError("Seller reputation object was not found.");
+      return;
+    }
+
+    if (reviewRating < 1 || reviewRating > 5) {
+      setError("Choose a rating from 1 to 5 stars.");
+      return;
+    }
+
+    const comment = reviewComment.trim();
+
+    const commentBytes = new TextEncoder().encode(comment).length;
+
+    if (commentBytes > 280) {
+      setError("Review comment must be 280 bytes or less.");
+      return;
+    }
+
+    const confirmed = window.confirm(
+      `Submit ${reviewRating}-star review?\n\n` +
+        `Reviews cannot be submitted twice for the same order.`
+    );
+
+    if (!confirmed) return;
+
+    const tx = submitReviewTx({
+      merchantId: merchant.objectId,
+      productId: product.objectId,
+      orderId: order.objectId,
+      escrowId: escrow.objectId,
+      reputationId: reputation.objectId,
+      rating: reviewRating,
+      comment,
+    });
+
+    const success = await runTransaction(
+      tx,
+      "Your review was submitted successfully."
+    );
+
+    if (success) {
+      setReviewRating(0);
+      setReviewComment("");
+    }
+  }
 
   async function acceptOrder() {
     const confirmed = window.confirm(
@@ -854,9 +935,93 @@ export default function OrderDetailsPage() {
 
           {status === ESCROW_STATUS.COMPLETED &&
             !mutualCancellationCompleted && (
-              <p className="order-completed-message">
-                ✓ This order has been completed.
-              </p>
+              <>
+                <p className="order-completed-message">
+                  ✓ This order has been completed.
+                </p>
+
+                {canBuyerReview && (
+                  <div className="order-review-panel">
+                    <div className="order-review-heading">
+                      <h3>Write a Review</h3>
+                      <p>Share your experience with this product and seller.</p>
+                    </div>
+
+                    <div className="order-review-rating">
+                      <span className="order-review-label">Your rating</span>
+
+                      <div
+                        className="order-review-stars"
+                        role="radiogroup"
+                        aria-label="Review rating"
+                      >
+                        {[1, 2, 3, 4, 5].map((star) => (
+                          <button
+                            key={star}
+                            type="button"
+                            className={
+                              star <= reviewRating
+                                ? "order-review-star selected"
+                                : "order-review-star"
+                            }
+                            onClick={() => setReviewRating(star)}
+                            disabled={processing}
+                            aria-label={`${star} star${star === 1 ? "" : "s"}`}
+                          >
+                            ★
+                          </button>
+                        ))}
+                      </div>
+
+                      {reviewRating > 0 && (
+                        <strong className="order-review-rating-text">
+                          {reviewRating} / 5
+                        </strong>
+                      )}
+                    </div>
+
+                    <div className="order-review-comment">
+                      <label htmlFor="review-comment">Comment</label>
+
+                      <textarea
+                        id="review-comment"
+                        rows={4}
+                        value={reviewComment}
+                        onChange={(event) =>
+                          setReviewComment(event.target.value)
+                        }
+                        placeholder="How was your experience?"
+                        disabled={processing}
+                      />
+
+                      <div className="order-review-counter">
+                        {new TextEncoder().encode(reviewComment).length} / 280
+                        bytes
+                      </div>
+                    </div>
+
+                    <button
+                      type="button"
+                      className="order-primary-button"
+                      disabled={
+                        processing ||
+                        reviewRating < 1 ||
+                        new TextEncoder().encode(reviewComment).length > 280
+                      }
+                      onClick={submitReview}
+                    >
+                      {processing ? "Submitting..." : "Submit Review"}
+                    </button>
+                  </div>
+                )}
+
+                {isBuyer && order.reviewed === true && (
+                  <div className="order-reviewed-message">
+                    <strong>✓ Review submitted</strong>
+                    <span>You have already reviewed this purchase.</span>
+                  </div>
+                )}
+              </>
             )}
 
           {mutualCancellationCompleted && (

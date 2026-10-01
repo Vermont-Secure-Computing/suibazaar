@@ -82,7 +82,7 @@ export default function CreateMerchant() {
 
   const fields = {
     storeName: "Store name",
-    descriptionUri: "Description URI",
+    descriptionUri: "Description",
     logoUri: "Logo URI",
     bannerUri: "Banner URI",
     shipsFrom: "Ships from",

@@ -7,4 +7,4 @@ published-at = "0xeff7599f193bfdca54dc90d29faff89adb27b91db47d2e152fda5cb4921954
 escrow = { local = "../../simple_sui_escrow/escrow_contract" }
 
 [environments]
-devnet = "5e01252e"
+devnet = "04502214"
