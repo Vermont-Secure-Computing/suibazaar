@@ -9,6 +9,7 @@ module solzaar_sui::marketplace {
     use sui::transfer;
     use sui::tx_context::{Self, TxContext};
     use sui::table::{Self, Table};
+    use sui::dynamic_field;
 
     use std::option;
 
@@ -46,6 +47,20 @@ module solzaar_sui::marketplace {
     const E_INVALID_REVIEW_PRODUCT: u64 = 25;
     const E_INVALID_REVIEW_MERCHANT: u64 = 26;
     const E_ORDER_ALREADY_REVIEWED: u64 = 27;
+    const E_EMPTY_MESSAGE: u64 = 28;
+    const E_MESSAGE_TOO_LONG: u64 = 29;
+    const E_INVALID_SPECIAL_PRICE: u64 = 30;
+    const E_SPECIAL_OFFER_EXPIRED: u64 = 31;
+    const E_SPECIAL_OFFER_INACTIVE: u64 = 32;
+    const E_SPECIAL_OFFER_BUYER_MISMATCH: u64 = 33;
+    const E_SPECIAL_OFFER_PRODUCT_MISMATCH: u64 = 34;
+    const E_PURCHASE_OFFER_EXPIRED: u64 = 35;
+    const E_PURCHASE_OFFER_INACTIVE: u64 = 36;
+    const E_PURCHASE_OFFER_BUYER_MISMATCH: u64 = 37;
+    const E_PURCHASE_OFFER_PRODUCT_MISMATCH: u64 = 38;
+    const E_PURCHASE_OFFER_ESCROW_MISMATCH: u64 = 39;
+    const E_ESCROW_ALREADY_BOUND: u64 = 40;
+    const E_LEGACY_CHECKOUT_DISABLED: u64 = 41;
 
     // ============================================================
     // Limits
@@ -66,6 +81,7 @@ module solzaar_sui::marketplace {
 
     const MAX_BPS: u64 = 10_000;
     const MAX_REVIEW_COMMENT: u64 = 280;
+    const MAX_MESSAGE_LENGTH: u64 = 280;
 
     // ============================================================
     // Merchant Registry
@@ -241,6 +257,140 @@ module solzaar_sui::marketplace {
         merchant: address,
         reviewer: address,
         rating: u8,
+    }
+
+    public struct ChatMessage has key {
+        id: UID,
+
+        product: ID,
+        buyer: address,
+        seller: address,
+
+        sender: address,
+        recipient: address,
+
+        message: String,
+        created_at: u64,
+    }
+
+    public struct SpecialPriceOffer has key {
+        id: UID,
+
+        product: ID,
+        seller: address,
+        buyer: address,
+
+        unit_price: u64,
+        quantity: u32,
+
+        expires_at: u64,
+
+        active: bool,
+        used: bool,
+
+        created_at: u64,
+    }
+
+    public struct SpecialPriceOffered has copy, drop {
+        offer_id: ID,
+        product: ID,
+
+        seller: address,
+        buyer: address,
+
+        unit_price: u64,
+        quantity: u32,
+
+        expires_at: u64,
+    }
+
+    public struct SpecialPriceOfferCancelled has copy, drop {
+        offer_id: ID,
+        product: ID,
+        seller: address,
+        buyer: address,
+    }
+
+        // ============================================================
+    // Buyer-Funded Purchase Offer
+    // ============================================================
+
+    public struct PurchaseOffer has key {
+        id: UID,
+
+        product: ID,
+        escrow: ID,
+
+        buyer: address,
+        seller: address,
+
+        unit_price: u64,
+        quantity: u32,
+        total_price: u64,
+        security_deposit: u64,
+        buyer_deposit: u64,
+
+        expires_at: u64,
+
+        active: bool,
+        accepted: bool,
+        rejected: bool,
+        withdrawn: bool,
+
+        created_at: u64,
+    }
+
+    public struct PurchaseOfferCreated has copy, drop {
+        offer_id: ID,
+        product: ID,
+        escrow: ID,
+
+        buyer: address,
+        seller: address,
+
+        unit_price: u64,
+        quantity: u32,
+        total_price: u64,
+        buyer_deposit: u64,
+
+        expires_at: u64,
+    }
+
+    public struct PurchaseOfferAccepted has copy, drop {
+        offer_id: ID,
+        product: ID,
+        escrow: ID,
+        buyer: address,
+        seller: address,
+    }
+
+    public struct PurchaseOfferRejected has copy, drop {
+        offer_id: ID,
+        product: ID,
+        escrow: ID,
+        buyer: address,
+        seller: address,
+    }
+
+    public struct PurchaseOfferWithdrawn has copy, drop {
+        offer_id: ID,
+        product: ID,
+        escrow: ID,
+        buyer: address,
+        seller: address,
+    }
+
+    public struct MessageSent has copy, drop {
+        message_id: ID,
+        product: ID,
+
+        buyer: address,
+        seller: address,
+
+        sender: address,
+        recipient: address,
+
+        created_at: u64,
     }
 
     // ============================================================
@@ -702,13 +852,28 @@ module solzaar_sui::marketplace {
     // Create Order Record
     // ============================================================
 
+    // Legacy V1 entry point.
+    // Disabled to prevent bypassing escrow reuse protection.
     public fun create_order_record(
+        _merchant: &MerchantProfile,
+        _product: &mut Product,
+        _escrow_object: &Escrow,
+        _quantity: u32,
+        _clock: &Clock,
+        _ctx: &mut TxContext,
+    ) {
+        abort E_LEGACY_CHECKOUT_DISABLED
+    }
+
+    public fun create_order_record_v2(
+        registry: &mut MerchantRegistry,
         merchant: &MerchantProfile,
         product: &mut Product,
         escrow_object: &Escrow,
         quantity: u32,
         clock: &Clock,
         ctx: &mut TxContext,
+        
     ) {
         let buyer = tx_context::sender(ctx);
         let seller = product.merchant;
@@ -903,6 +1068,276 @@ module solzaar_sui::marketplace {
             quantity,
             total_price,
         });
+
+         bind_escrow(
+            registry,
+            object::id(escrow_object),
+        );
+
+        transfer::share_object(order);
+    }
+
+        // ============================================================
+    // Create Special Price Order Record
+    // ============================================================
+
+    public fun create_special_order_record(
+        registry: &mut MerchantRegistry,
+        merchant: &MerchantProfile,
+        product: &mut Product,
+        offer: &mut SpecialPriceOffer,
+        escrow_object: &Escrow,
+        clock: &Clock,
+        ctx: &mut TxContext,
+    ) {
+        let buyer = tx_context::sender(ctx);
+        let seller = product.merchant;
+        let now = clock::timestamp_ms(clock);
+
+        // --------------------------------------------------------
+        // Merchant / Product validation
+        // --------------------------------------------------------
+
+        assert!(
+            merchant.authority == seller,
+            E_UNAUTHORIZED
+        );
+
+        assert!(
+            merchant.active,
+            E_MERCHANT_INACTIVE
+        );
+
+        assert!(
+            product.active,
+            E_PRODUCT_DELETED
+        );
+
+        assert!(
+            !product.deleted,
+            E_PRODUCT_DELETED
+        );
+
+        // --------------------------------------------------------
+        // Special offer validation
+        // --------------------------------------------------------
+
+        // Offer must belong to this exact product.
+        assert!(
+            offer.product == object::id(product),
+            E_SPECIAL_OFFER_PRODUCT_MISMATCH
+        );
+
+        // Offer seller must still be the product seller.
+        assert!(
+            offer.seller == seller,
+            E_UNAUTHORIZED
+        );
+
+        // Only the buyer named in the offer may use it.
+        assert!(
+            offer.buyer == buyer,
+            E_SPECIAL_OFFER_BUYER_MISMATCH
+        );
+
+        // Cancelled / disabled offer cannot be used.
+        assert!(
+            offer.active,
+            E_SPECIAL_OFFER_INACTIVE
+        );
+
+        // One-time use only.
+        assert!(
+            !offer.used,
+            E_SPECIAL_OFFER_INACTIVE
+        );
+
+        // Offer must still be valid.
+        assert!(
+            offer.expires_at > now,
+            E_SPECIAL_OFFER_EXPIRED
+        );
+
+        assert!(
+            offer.unit_price > 0,
+            E_INVALID_SPECIAL_PRICE
+        );
+
+        assert!(
+            offer.quantity > 0,
+            E_INVALID_QUANTITY
+        );
+
+        assert!(
+            product.stock >= offer.quantity,
+            E_INSUFFICIENT_STOCK
+        );
+
+        // --------------------------------------------------------
+        // Calculate negotiated order amount
+        // --------------------------------------------------------
+
+        let quantity = offer.quantity;
+        let unit_price = offer.unit_price;
+        let quantity_u64 = quantity as u64;
+
+        let total_price =
+            checked_mul(
+                unit_price,
+                quantity_u64
+            );
+
+        let deposit_numerator =
+            checked_mul(
+                total_price,
+                merchant.seller_deposit_bps as u64
+            );
+
+        let mut security_deposit =
+            deposit_numerator / 10_000;
+
+        // Same behavior as normal Solzaar order:
+        // minimum seller security deposit is 1 MIST.
+        if (security_deposit == 0) {
+            security_deposit = 1;
+        };
+
+        let expected_buyer_deposit =
+            checked_add_u64(
+                total_price,
+                security_deposit
+            );
+
+        // --------------------------------------------------------
+        // Escrow validation
+        // --------------------------------------------------------
+
+        assert!(
+            escrow::status(escrow_object) == 0,
+            E_INVALID_ORDER_STATUS
+        );
+
+        assert!(
+            escrow::creator(escrow_object) == buyer,
+            E_INVALID_ESCROW_PARTIES
+        );
+
+        assert!(
+            contains_solzaar_marker(
+                escrow::note(escrow_object)
+            ),
+            E_NOT_SOLZAAR_ESCROW
+        );
+
+        let party_a =
+            escrow::party_a_address(escrow_object);
+
+        let party_b =
+            escrow::party_b_address(escrow_object);
+
+        assert!(
+            party_a == buyer,
+            E_INVALID_ESCROW_PARTIES
+        );
+
+        assert!(
+            party_b == seller,
+            E_INVALID_ESCROW_PARTIES
+        );
+
+        assert!(
+            party_a != party_b,
+            E_INVALID_ESCROW_PARTIES
+        );
+
+        // Escrow sale amount must match negotiated total exactly.
+        assert!(
+            escrow::reference_amount(escrow_object)
+                == total_price,
+            E_INVALID_ORDER_AMOUNT
+        );
+
+        assert!(
+            escrow::required_deposit_a(escrow_object)
+                == expected_buyer_deposit,
+            E_INVALID_BUYER_DEPOSIT
+        );
+
+        assert!(
+            escrow::deposited_a(escrow_object)
+                == expected_buyer_deposit,
+            E_BUYER_DEPOSIT_INCOMPLETE
+        );
+
+        assert!(
+            escrow::required_deposit_b(escrow_object)
+                == security_deposit,
+            E_INVALID_SELLER_DEPOSIT
+        );
+
+        // --------------------------------------------------------
+        // Consume offer + reserve stock
+        // --------------------------------------------------------
+
+        offer.used = true;
+        offer.active = false;
+
+        product.stock =
+            product.stock - quantity;
+
+        product.updated_at = now;
+
+        // --------------------------------------------------------
+        // Create immutable order record
+        // --------------------------------------------------------
+
+        let order = OrderRecord {
+            id: object::new(ctx),
+
+            escrow:
+                object::id(escrow_object),
+
+            product:
+                object::id(product),
+
+            buyer,
+            seller,
+
+            quantity,
+            unit_price,
+            total_price,
+            security_deposit,
+
+            completed_sale_recorded: false,
+            stock_restored: false,
+            reviewed: false,
+
+            created_at: now,
+        };
+
+        let order_id =
+            object::uid_to_inner(&order.id);
+
+        event::emit(OrderCreated {
+            order_id,
+
+            escrow_id:
+                object::id(escrow_object),
+
+            product_id:
+                object::id(product),
+
+            buyer,
+            seller,
+
+            quantity,
+            total_price,
+        });
+
+        bind_escrow(
+            registry,
+            object::id(escrow_object),
+        );
 
         transfer::share_object(order);
     }
@@ -1406,6 +1841,12 @@ module solzaar_sui::marketplace {
         merchant.total_sold
     }
 
+    public fun product_object_id(
+        product: &Product,
+    ): ID {
+        object::id(product)
+    }
+
     public fun product_merchant(
         product: &Product,
     ): address {
@@ -1458,6 +1899,10 @@ module solzaar_sui::marketplace {
 
     public fun order_quantity(order: &OrderRecord): u32 {
         order.quantity
+    }
+
+    public fun order_unit_price(order: &OrderRecord): u64 {
+        order.unit_price
     }
 
     public fun order_total_price(order: &OrderRecord): u64 {
@@ -1532,5 +1977,920 @@ module solzaar_sui::marketplace {
         reputation: &MerchantReputation,
     ): u64 {
         reputation.one_star
+    }
+
+        public fun message_product(
+        message: &ChatMessage,
+    ): ID {
+        message.product
+    }
+
+    public fun message_buyer(
+        message: &ChatMessage,
+    ): address {
+        message.buyer
+    }
+
+    public fun message_seller(
+        message: &ChatMessage,
+    ): address {
+        message.seller
+    }
+
+    public fun message_sender(
+        message: &ChatMessage,
+    ): address {
+        message.sender
+    }
+
+    public fun message_recipient(
+        message: &ChatMessage,
+    ): address {
+        message.recipient
+    }
+
+    public fun message_created_at(
+        message: &ChatMessage,
+    ): u64 {
+        message.created_at
+    }
+
+    public fun send_product_message(
+        product: &Product,
+        buyer: address,
+        message: String,
+        clock: &Clock,
+        ctx: &mut TxContext,
+    ) {
+        let sender = tx_context::sender(ctx);
+        let seller = product.merchant;
+
+        // Product must still exist as a valid listing.
+        assert!(
+            !product.deleted,
+            E_PRODUCT_DELETED
+        );
+
+        // Buyer and seller cannot be the same wallet.
+        assert!(
+            buyer != seller,
+            E_INVALID_ESCROW_PARTIES
+        );
+
+        // Only the specified buyer or product seller
+        // may participate in this conversation.
+        assert!(
+            sender == buyer || sender == seller,
+            E_UNAUTHORIZED
+        );
+
+        // Message cannot be empty.
+        assert!(
+            message.length() > 0,
+            E_EMPTY_MESSAGE
+        );
+
+        // Limit message size.
+        assert!(
+            message.length() <= MAX_MESSAGE_LENGTH,
+            E_MESSAGE_TOO_LONG
+        );
+
+        // Recipient is derived by the contract.
+        let recipient =
+            if (sender == buyer) {
+                seller
+            } else {
+                buyer
+            };
+
+        let chat_message = ChatMessage {
+            id: object::new(ctx),
+
+            product: object::id(product),
+            buyer,
+            seller,
+
+            sender,
+            recipient,
+
+            message,
+            created_at: clock::timestamp_ms(clock),
+        };
+
+        let message_id =
+            object::uid_to_inner(&chat_message.id);
+
+        event::emit(MessageSent {
+            message_id,
+            product: object::id(product),
+
+            buyer,
+            seller,
+
+            sender,
+            recipient,
+
+            created_at: clock::timestamp_ms(clock),
+        });
+
+        transfer::share_object(chat_message);
+    }
+
+        // ============================================================
+    // Create Buyer-Funded Purchase Offer
+    // ============================================================
+
+    public fun create_purchase_offer(
+        merchant: &MerchantProfile,
+        product: &Product,
+        escrow_object: &Escrow,
+        unit_price: u64,
+        quantity: u32,
+        expires_at: u64,
+        clock: &Clock,
+        ctx: &mut TxContext,
+    ) {
+        let buyer = tx_context::sender(ctx);
+        let seller = product.merchant;
+        let now = clock::timestamp_ms(clock);
+
+        // --------------------------------------------------------
+        // Merchant / Product validation
+        // --------------------------------------------------------
+
+        assert!(
+            merchant.authority == seller,
+            E_UNAUTHORIZED
+        );
+
+        assert!(
+            merchant.active,
+            E_MERCHANT_INACTIVE
+        );
+
+        assert!(
+            product.active,
+            E_PRODUCT_DELETED
+        );
+
+        assert!(
+            !product.deleted,
+            E_PRODUCT_DELETED
+        );
+
+        // Buyer cannot make an offer to their own product.
+        assert!(
+            buyer != seller,
+            E_INVALID_ESCROW_PARTIES
+        );
+
+        // --------------------------------------------------------
+        // Offer validation
+        // --------------------------------------------------------
+
+        assert!(
+            unit_price > 0,
+            E_INVALID_SPECIAL_PRICE
+        );
+
+        assert!(
+            quantity > 0,
+            E_INVALID_QUANTITY
+        );
+
+        assert!(
+            product.stock >= quantity,
+            E_INSUFFICIENT_STOCK
+        );
+
+        assert!(
+            expires_at > now,
+            E_PURCHASE_OFFER_EXPIRED
+        );
+
+        // --------------------------------------------------------
+        // Calculate negotiated amount
+        // --------------------------------------------------------
+
+        let quantity_u64 = quantity as u64;
+
+        let total_price =
+            checked_mul(
+                unit_price,
+                quantity_u64
+            );
+
+        let deposit_numerator =
+            checked_mul(
+                total_price,
+                merchant.seller_deposit_bps as u64
+            );
+
+        let mut security_deposit =
+            deposit_numerator / 10_000;
+
+        // Same minimum deposit behavior as normal orders.
+        if (security_deposit == 0) {
+            security_deposit = 1;
+        };
+
+        let buyer_deposit =
+            checked_add_u64(
+                total_price,
+                security_deposit
+            );
+
+        // --------------------------------------------------------
+        // Verify exact buyer-funded escrow
+        // --------------------------------------------------------
+
+        // Seller must not have deposited yet.
+        assert!(
+            escrow::status(escrow_object) == 0,
+            E_INVALID_ORDER_STATUS
+        );
+
+        // Buyer must be the escrow creator.
+        assert!(
+            escrow::creator(escrow_object) == buyer,
+            E_INVALID_ESCROW_PARTIES
+        );
+
+        // Must be a Solzaar-created escrow.
+        assert!(
+            contains_solzaar_marker(
+                escrow::note(escrow_object)
+            ),
+            E_NOT_SOLZAAR_ESCROW
+        );
+
+        let party_a =
+            escrow::party_a_address(escrow_object);
+
+        let party_b =
+            escrow::party_b_address(escrow_object);
+
+        assert!(
+            party_a == buyer,
+            E_INVALID_ESCROW_PARTIES
+        );
+
+        assert!(
+            party_b == seller,
+            E_INVALID_ESCROW_PARTIES
+        );
+
+        assert!(
+            party_a != party_b,
+            E_INVALID_ESCROW_PARTIES
+        );
+
+        // Exact negotiated sale amount.
+        assert!(
+            escrow::reference_amount(escrow_object)
+                == total_price,
+            E_INVALID_ORDER_AMOUNT
+        );
+
+        // Exact amount buyer was required to deposit.
+        assert!(
+            escrow::required_deposit_a(escrow_object)
+                == buyer_deposit,
+            E_INVALID_BUYER_DEPOSIT
+        );
+
+        // Buyer funds must already be locked.
+        assert!(
+            escrow::deposited_a(escrow_object)
+                == buyer_deposit,
+            E_BUYER_DEPOSIT_INCOMPLETE
+        );
+
+        // Seller's required future security deposit.
+        assert!(
+            escrow::required_deposit_b(escrow_object)
+                == security_deposit,
+            E_INVALID_SELLER_DEPOSIT
+        );
+
+        // --------------------------------------------------------
+        // Create PurchaseOffer
+        // --------------------------------------------------------
+
+        let offer = PurchaseOffer {
+            id: object::new(ctx),
+
+            product: object::id(product),
+            escrow: object::id(escrow_object),
+
+            buyer,
+            seller,
+
+            unit_price,
+            quantity,
+            total_price,
+            security_deposit,
+            buyer_deposit,
+
+            expires_at,
+
+            active: true,
+            accepted: false,
+            rejected: false,
+            withdrawn: false,
+
+            created_at: now,
+        };
+
+        let offer_id =
+            object::uid_to_inner(&offer.id);
+
+        event::emit(PurchaseOfferCreated {
+            offer_id,
+
+            product:
+                object::id(product),
+
+            escrow:
+                object::id(escrow_object),
+
+            buyer,
+            seller,
+
+            unit_price,
+            quantity,
+            total_price,
+            buyer_deposit,
+
+            expires_at,
+        });
+
+
+        transfer::share_object(offer);
+    }
+
+
+    // ============================================================
+    // Accept Buyer-Funded Purchase Offer
+    // ============================================================
+
+    public fun accept_purchase_offer(
+        registry: &mut MerchantRegistry,
+        merchant: &MerchantProfile,
+        product: &mut Product,
+        offer: &mut PurchaseOffer,
+        escrow_object: &Escrow,
+        clock: &Clock,
+        ctx: &mut TxContext,
+    ) {
+        let seller = tx_context::sender(ctx);
+        let now = clock::timestamp_ms(clock);
+
+        // --------------------------------------------------------
+        // Seller / merchant validation
+        // --------------------------------------------------------
+
+        assert!(
+            seller == offer.seller,
+            E_UNAUTHORIZED
+        );
+
+        assert!(
+            merchant.authority == seller,
+            E_UNAUTHORIZED
+        );
+
+        assert!(
+            merchant.active,
+            E_MERCHANT_INACTIVE
+        );
+
+        // --------------------------------------------------------
+        // Offer validation
+        // --------------------------------------------------------
+
+        assert!(
+            offer.active,
+            E_PURCHASE_OFFER_INACTIVE
+        );
+
+        assert!(
+            !offer.accepted &&
+            !offer.rejected &&
+            !offer.withdrawn,
+            E_PURCHASE_OFFER_INACTIVE
+        );
+
+        assert!(
+            now < offer.expires_at,
+            E_PURCHASE_OFFER_EXPIRED
+        );
+
+        // --------------------------------------------------------
+        // Escrow validation
+        // --------------------------------------------------------
+
+        assert!(
+            escrow::status(escrow_object) == 0,
+            E_INVALID_ORDER_STATUS
+        );
+
+        assert!(
+            escrow::deposited_a(escrow_object) == offer.buyer_deposit,
+            E_BUYER_DEPOSIT_INCOMPLETE
+        );
+
+        assert!(
+            object::id(escrow_object) == offer.escrow,
+            E_INVALID_ORDER_STATUS
+        );
+
+        // --------------------------------------------------------
+        // Product validation
+        // --------------------------------------------------------
+
+        assert!(
+            object::id(product) == offer.product,
+            E_PURCHASE_OFFER_PRODUCT_MISMATCH
+        );
+
+        assert!(
+            product.merchant == seller,
+            E_UNAUTHORIZED
+        );
+
+        assert!(
+            product.active && !product.deleted,
+            E_PRODUCT_DELETED
+        );
+
+        assert!(
+            offer.quantity > 0,
+            E_INVALID_QUANTITY
+        );
+
+        assert!(
+            product.stock >= offer.quantity,
+            E_INSUFFICIENT_STOCK
+        );
+
+        // --------------------------------------------------------
+        // Verify offer amounts
+        // --------------------------------------------------------
+
+        assert!(
+            offer.unit_price > 0,
+            E_INVALID_SPECIAL_PRICE
+        );
+
+        let expected_total = checked_mul(
+            offer.unit_price,
+            offer.quantity as u64
+        );
+
+        assert!(
+            expected_total == offer.total_price,
+            E_INVALID_ORDER_AMOUNT
+        );
+
+        let expected_buyer_deposit = checked_add_u64(
+            offer.total_price,
+            offer.security_deposit
+        );
+
+        assert!(
+            expected_buyer_deposit == offer.buyer_deposit,
+            E_INVALID_BUYER_DEPOSIT
+        );
+
+        // --------------------------------------------------------
+        // Escrow validation
+        // --------------------------------------------------------
+
+        assert!(
+            object::id(escrow_object) == offer.escrow,
+            E_PURCHASE_OFFER_ESCROW_MISMATCH
+        );
+
+        assert!(
+            escrow::status(escrow_object) == 0,
+            E_INVALID_ORDER_STATUS
+        );
+
+        assert!(
+            escrow::creator(escrow_object) == offer.buyer,
+            E_INVALID_ESCROW_PARTIES
+        );
+
+        assert!(
+            contains_solzaar_marker(
+                escrow::note(escrow_object)
+            ),
+            E_NOT_SOLZAAR_ESCROW
+        );
+
+        assert!(
+            escrow::party_a_address(escrow_object)
+                == offer.buyer,
+            E_INVALID_ESCROW_PARTIES
+        );
+
+        assert!(
+            escrow::party_b_address(escrow_object)
+                == seller,
+            E_INVALID_ESCROW_PARTIES
+        );
+
+        assert!(
+            offer.buyer != seller,
+            E_INVALID_ESCROW_PARTIES
+        );
+
+        assert!(
+            escrow::reference_amount(escrow_object)
+                == offer.total_price,
+            E_INVALID_ORDER_AMOUNT
+        );
+
+        assert!(
+            escrow::required_deposit_a(escrow_object)
+                == offer.buyer_deposit,
+            E_INVALID_BUYER_DEPOSIT
+        );
+
+        assert!(
+            escrow::deposited_a(escrow_object)
+                == offer.buyer_deposit,
+            E_BUYER_DEPOSIT_INCOMPLETE
+        );
+
+        assert!(
+            escrow::required_deposit_b(escrow_object)
+                == offer.security_deposit,
+            E_INVALID_SELLER_DEPOSIT
+        );
+
+        assert!(
+            escrow::deposited_b(escrow_object) == 0,
+            E_INVALID_SELLER_DEPOSIT
+        );
+
+        // --------------------------------------------------------
+        // Reserve product stock
+        // --------------------------------------------------------
+
+        bind_escrow(registry, offer.escrow);
+
+        product.stock = product.stock - offer.quantity;
+        product.updated_at = now;
+
+        // --------------------------------------------------------
+        // Create OrderRecord
+        // --------------------------------------------------------
+
+        let order = OrderRecord {
+            id: object::new(ctx),
+
+            escrow: offer.escrow,
+            product: offer.product,
+
+            buyer: offer.buyer,
+            seller,
+
+            quantity: offer.quantity,
+            unit_price: offer.unit_price,
+            total_price: offer.total_price,
+            security_deposit: offer.security_deposit,
+
+            completed_sale_recorded: false,
+            stock_restored: false,
+            reviewed: false,
+
+            created_at: now,
+        };
+
+        let order_id = object::uid_to_inner(&order.id);
+
+        // --------------------------------------------------------
+        // Mark offer accepted
+        // --------------------------------------------------------
+
+        offer.active = false;
+        offer.accepted = true;
+
+        // --------------------------------------------------------
+        // Emit events
+        // --------------------------------------------------------
+
+        event::emit(PurchaseOfferAccepted {
+            offer_id: object::id(offer),
+            product: offer.product,
+            escrow: offer.escrow,
+            buyer: offer.buyer,
+            seller,
+        });
+
+        event::emit(OrderCreated {
+            order_id,
+            escrow_id: offer.escrow,
+            product_id: offer.product,
+            buyer: offer.buyer,
+            seller,
+            quantity: offer.quantity,
+            total_price: offer.total_price,
+        });
+
+        transfer::share_object(order);
+    }
+
+    // ============================================================
+    // Reject Buyer-Funded Purchase Offer
+    // ============================================================
+
+    public fun reject_purchase_offer(
+        offer: &mut PurchaseOffer,
+        ctx: &mut TxContext,
+    ) {
+        let seller = tx_context::sender(ctx);
+
+        assert!(
+            seller == offer.seller,
+            E_UNAUTHORIZED
+        );
+
+        assert!(
+            offer.active &&
+            !offer.accepted &&
+            !offer.rejected &&
+            !offer.withdrawn,
+            E_PURCHASE_OFFER_INACTIVE
+        );
+
+        offer.active = false;
+        offer.rejected = true;
+
+        event::emit(PurchaseOfferRejected {
+            offer_id: object::id(offer),
+            product: offer.product,
+            escrow: offer.escrow,
+            buyer: offer.buyer,
+            seller: offer.seller,
+        });
+    }
+    
+    // ============================================================
+    // Withdraw Pending Purchase Offer
+    // ============================================================
+
+    public fun withdraw_purchase_offer(
+        offer: &mut PurchaseOffer,
+        ctx: &mut TxContext,
+    ) {
+        let buyer = tx_context::sender(ctx);
+
+        assert!(
+            buyer == offer.buyer,
+            E_UNAUTHORIZED
+        );
+
+        assert!(
+            offer.active &&
+            !offer.accepted &&
+            !offer.rejected &&
+            !offer.withdrawn,
+            E_PURCHASE_OFFER_INACTIVE
+        );
+
+        offer.active = false;
+        offer.withdrawn = true;
+
+        event::emit(PurchaseOfferWithdrawn {
+            offer_id: object::id(offer),
+            product: offer.product,
+            escrow: offer.escrow,
+            buyer: offer.buyer,
+            seller: offer.seller,
+        });
+    }
+     
+
+    public fun create_special_price_offer(
+        product: &Product,
+        buyer: address,
+        unit_price: u64,
+        quantity: u32,
+        expires_at: u64,
+        clock: &Clock,
+        ctx: &mut TxContext,
+    ) {
+        let seller = tx_context::sender(ctx);
+        let now = clock::timestamp_ms(clock);
+
+        // Seller only.
+        assert!(
+            seller == product.merchant,
+            E_UNAUTHORIZED
+        );
+
+        assert!(
+            product.active,
+            E_PRODUCT_DELETED
+        );
+
+        assert!(
+            !product.deleted,
+            E_PRODUCT_DELETED
+        );
+
+        assert!(
+            buyer != seller,
+            E_INVALID_ESCROW_PARTIES
+        );
+
+        assert!(
+            unit_price > 0,
+            E_INVALID_SPECIAL_PRICE
+        );
+
+        assert!(
+            quantity > 0,
+            E_INVALID_QUANTITY
+        );
+
+        assert!(
+            product.stock >= quantity,
+            E_INSUFFICIENT_STOCK
+        );
+
+        // Offer must expire in the future.
+        assert!(
+            expires_at > now,
+            E_SPECIAL_OFFER_EXPIRED
+        );
+
+        let offer = SpecialPriceOffer {
+            id: object::new(ctx),
+
+            product: object::id(product),
+            seller,
+            buyer,
+
+            unit_price,
+            quantity,
+
+            expires_at,
+
+            active: true,
+            used: false,
+
+            created_at: now,
+        };
+
+        let offer_id =
+            object::uid_to_inner(&offer.id);
+
+        event::emit(SpecialPriceOffered {
+            offer_id,
+            product: object::id(product),
+
+            seller,
+            buyer,
+
+            unit_price,
+            quantity,
+
+            expires_at,
+        });
+
+        transfer::share_object(offer);
+    }
+
+    public fun cancel_special_price_offer(
+        offer: &mut SpecialPriceOffer,
+        ctx: &TxContext,
+    ) {
+        let sender = tx_context::sender(ctx);
+
+        // Only the seller who created the offer may cancel it.
+        assert!(
+            sender == offer.seller,
+            E_UNAUTHORIZED
+        );
+
+        // Already cancelled or already consumed offers
+        // cannot be cancelled again.
+        assert!(
+            offer.active,
+            E_SPECIAL_OFFER_INACTIVE
+        );
+
+        assert!(
+            !offer.used,
+            E_SPECIAL_OFFER_INACTIVE
+        );
+
+        offer.active = false;
+
+        event::emit(SpecialPriceOfferCancelled {
+            offer_id: object::id(offer),
+            product: offer.product,
+            seller: offer.seller,
+            buyer: offer.buyer,
+        });
+    }
+
+    public fun special_offer_product(
+        offer: &SpecialPriceOffer,
+    ): ID {
+        offer.product
+    }
+
+    public fun special_offer_seller(
+        offer: &SpecialPriceOffer,
+    ): address {
+        offer.seller
+    }
+
+    public fun special_offer_buyer(
+        offer: &SpecialPriceOffer,
+    ): address {
+        offer.buyer
+    }
+
+    public fun special_offer_unit_price(
+        offer: &SpecialPriceOffer,
+    ): u64 {
+        offer.unit_price
+    }
+
+    public fun special_offer_quantity(
+        offer: &SpecialPriceOffer,
+    ): u32 {
+        offer.quantity
+    }
+
+    public fun special_offer_expires_at(
+        offer: &SpecialPriceOffer,
+    ): u64 {
+        offer.expires_at
+    }
+
+    public fun special_offer_active(
+        offer: &SpecialPriceOffer,
+    ): bool {
+        offer.active
+    }
+
+    public fun special_offer_used(
+        offer: &SpecialPriceOffer,
+    ): bool {
+        offer.used
+    }
+
+    public fun special_offer_created_at(
+        offer: &SpecialPriceOffer,
+    ): u64 {
+        offer.created_at
+    }
+
+        public fun purchase_offer_unit_price(
+        offer: &PurchaseOffer,
+    ): u64 {
+        offer.unit_price
+    }
+
+    public fun purchase_offer_total_price(
+        offer: &PurchaseOffer,
+    ): u64 {
+        offer.total_price
+    }
+
+    public fun purchase_offer_buyer_deposit(
+        offer: &PurchaseOffer,
+    ): u64 {
+        offer.buyer_deposit
+    }
+
+    public fun purchase_offer_active(
+        offer: &PurchaseOffer,
+    ): bool {
+        offer.active
+    }
+
+    fun bind_escrow(
+        registry: &mut MerchantRegistry,
+        escrow_id: ID,
+    ) {
+        assert!(
+            !dynamic_field::exists(&registry.id, escrow_id),
+            E_ESCROW_ALREADY_BOUND
+        );
+
+        dynamic_field::add(
+            &mut registry.id,
+            escrow_id,
+            true,
+        );
     }
 }

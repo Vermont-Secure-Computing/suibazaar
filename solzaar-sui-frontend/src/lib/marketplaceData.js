@@ -1,9 +1,28 @@
 import { SuiGrpcClient } from "@mysten/sui/grpc";
-import { MARKETPLACE_PACKAGE_ID, ESCROW_PACKAGE_ID, MODULE } from "../config";
+
+import {
+  MARKETPLACE_PACKAGE_ID,
+  MARKETPLACE_LATEST_PACKAGE_ID,
+  ESCROW_PACKAGE_ID,
+  MODULE,
+} from "../config";
+
+const NETWORK = import.meta.env.VITE_SUI_NETWORK || "devnet";
+
+const GRPC_URLS = {
+  devnet: "https://fullnode.devnet.sui.io:443",
+
+  mainnet: "https://fullnode.mainnet.sui.io:443",
+};
+
+if (!GRPC_URLS[NETWORK]) {
+  throw new Error(`Unsupported Sui network: ${NETWORK}`);
+}
 
 const client = new SuiGrpcClient({
-  network: "devnet",
-  baseUrl: "https://fullnode.devnet.sui.io:443",
+  network: NETWORK,
+
+  baseUrl: GRPC_URLS[NETWORK],
 });
 
 const MERCHANT_EVENT = `${MARKETPLACE_PACKAGE_ID}::${MODULE}::MerchantCreated`;
@@ -19,7 +38,9 @@ export async function getMerchants() {
     filter: {
       eventType: MERCHANT_EVENT,
     },
+
     order: "descending",
+
     limit: 50,
   });
 
@@ -40,7 +61,9 @@ export async function getMerchants() {
       filter: {
         eventType: MERCHANT_EVENT,
       },
+
       before: page.endCursor,
+
       limit: 50,
     });
   }
@@ -53,23 +76,29 @@ export async function getMerchants() {
 
   const result = await client.getObjects({
     objectIds: ids,
+
     include: {
       json: true,
     },
   });
 
   return (result.objects ?? [])
+
     .filter((object) => !(object instanceof Error))
+
     .map((object) => ({
       objectId: object.objectId,
+
       ...object.json,
     }))
+
     .filter((merchant) => merchant.active !== false);
 }
 
 export async function getMerchant(objectId) {
   const result = await client.getObject({
     objectId,
+
     include: {
       json: true,
     },
@@ -77,6 +106,7 @@ export async function getMerchant(objectId) {
 
   return {
     objectId: result.object.objectId,
+
     ...result.object.json,
   };
 }
@@ -88,7 +118,9 @@ export async function getMerchantByOwner(owner) {
 
   const result = await client.listOwnedObjects({
     owner,
+
     type,
+
     include: {
       json: true,
     },
@@ -104,6 +136,7 @@ export async function getMerchantByOwner(owner) {
 
   return {
     objectId: object.objectId,
+
     ...object.json,
   };
 }
@@ -119,7 +152,9 @@ export async function getProductsByMerchant(merchantAddress) {
     filter: {
       eventType,
     },
+
     order: "descending",
+
     limit: 50,
   });
 
@@ -142,7 +177,9 @@ export async function getProductsByMerchant(merchantAddress) {
       filter: {
         eventType,
       },
+
       before: page.endCursor,
+
       limit: 50,
     });
   }
@@ -155,17 +192,22 @@ export async function getProductsByMerchant(merchantAddress) {
 
   const result = await client.getObjects({
     objectIds: ids,
+
     include: {
       json: true,
     },
   });
 
   return (result.objects ?? [])
+
     .filter((object) => !(object instanceof Error))
+
     .map((object) => ({
       objectId: object.objectId,
+
       ...object.json,
     }))
+
     .filter((product) => product.deleted !== true && product.active !== false);
 }
 
@@ -176,6 +218,7 @@ export async function getProduct(objectId) {
 
   const result = await client.getObject({
     objectId,
+
     include: {
       json: true,
     },
@@ -183,6 +226,7 @@ export async function getProduct(objectId) {
 
   return {
     objectId: result.object.objectId,
+
     ...result.object.json,
   };
 }
@@ -207,7 +251,9 @@ export async function getEscrowCreatedByDigest(digest) {
     filter: {
       eventType,
     },
+
     order: "descending",
+
     limit: 50,
   });
 
@@ -232,6 +278,7 @@ export async function getOrderRecord(objectId) {
 
   const result = await client.getObject({
     objectId,
+
     include: {
       json: true,
     },
@@ -243,6 +290,7 @@ export async function getOrderRecord(objectId) {
 
   return {
     objectId: result.object.objectId,
+
     ...result.object.json,
   };
 }
@@ -258,7 +306,9 @@ export async function getOrderRecords() {
     filter: {
       eventType: ORDER_EVENT,
     },
+
     order: "descending",
+
     limit: 50,
   });
 
@@ -281,7 +331,9 @@ export async function getOrderRecords() {
       filter: {
         eventType: ORDER_EVENT,
       },
+
       before: page.endCursor,
+
       limit: 50,
     });
   }
@@ -294,15 +346,19 @@ export async function getOrderRecords() {
 
   const result = await client.getObjects({
     objectIds: ids,
+
     include: {
       json: true,
     },
   });
 
   return (result.objects ?? [])
+
     .filter((object) => !(object instanceof Error))
+
     .map((object) => ({
       objectId: object.objectId,
+
       ...object.json,
     }));
 }
@@ -311,6 +367,7 @@ export async function getBuyerOrderRecords(buyerAddress) {
   if (!buyerAddress) return [];
 
   const orders = await getOrderRecords();
+
   const buyer = buyerAddress.toLowerCase();
 
   return orders.filter((order) => order.buyer?.toLowerCase() === buyer);
@@ -320,6 +377,7 @@ export async function getSellerOrderRecords(sellerAddress) {
   if (!sellerAddress) return [];
 
   const orders = await getOrderRecords();
+
   const seller = sellerAddress.toLowerCase();
 
   return orders.filter((order) => order.seller?.toLowerCase() === seller);
@@ -329,13 +387,13 @@ export async function getOrderRecordByEscrow(escrowId) {
   if (!escrowId) return null;
 
   const orders = await getOrderRecords();
+
   const target = escrowId.toLowerCase();
 
   return orders.find((order) => order.escrow?.toLowerCase() === target) ?? null;
 }
 
-const REPUTATION_EVENT =
-  `${MARKETPLACE_PACKAGE_ID}::${MODULE}::ReputationCreated`;
+const REPUTATION_EVENT = `${MARKETPLACE_PACKAGE_ID}::${MODULE}::ReputationCreated`;
 
 export async function getMerchantReputation(merchantAddress) {
   if (!merchantAddress) return null;
@@ -346,7 +404,9 @@ export async function getMerchantReputation(merchantAddress) {
     filter: {
       eventType: REPUTATION_EVENT,
     },
+
     order: "descending",
+
     limit: 50,
   });
 
@@ -354,12 +414,10 @@ export async function getMerchantReputation(merchantAddress) {
     for (const event of page.events ?? []) {
       const data = event.json;
 
-      if (
-        data?.merchant?.toLowerCase() === target &&
-        data?.reputation_id
-      ) {
+      if (data?.merchant?.toLowerCase() === target && data?.reputation_id) {
         const result = await client.getObject({
           objectId: data.reputation_id,
+
           include: {
             json: true,
           },
@@ -371,6 +429,7 @@ export async function getMerchantReputation(merchantAddress) {
 
         return {
           objectId: result.object.objectId,
+
           ...result.object.json,
         };
       }
@@ -384,7 +443,9 @@ export async function getMerchantReputation(merchantAddress) {
       filter: {
         eventType: REPUTATION_EVENT,
       },
+
       before: page.endCursor,
+
       limit: 50,
     });
   }
@@ -392,20 +453,22 @@ export async function getMerchantReputation(merchantAddress) {
   return null;
 }
 
-const REVIEW_EVENT =
-  `${MARKETPLACE_PACKAGE_ID}::${MODULE}::ReviewCreated`;
+const REVIEW_EVENT = `${MARKETPLACE_PACKAGE_ID}::${MODULE}::ReviewCreated`;
 
 export async function getProductReviews(productId) {
   if (!productId) return [];
 
   const target = productId.toLowerCase();
+
   const reviewIds = new Set();
 
   let page = await client.listEvents({
     filter: {
       eventType: REVIEW_EVENT,
     },
+
     order: "descending",
+
     limit: 50,
   });
 
@@ -413,10 +476,7 @@ export async function getProductReviews(productId) {
     for (const event of page.events ?? []) {
       const data = event.json;
 
-      if (
-        data?.product_id?.toLowerCase() === target &&
-        data?.review_id
-      ) {
+      if (data?.product_id?.toLowerCase() === target && data?.review_id) {
         reviewIds.add(data.review_id);
       }
     }
@@ -429,7 +489,9 @@ export async function getProductReviews(productId) {
       filter: {
         eventType: REVIEW_EVENT,
       },
+
       before: page.endCursor,
+
       limit: 50,
     });
   }
@@ -442,15 +504,287 @@ export async function getProductReviews(productId) {
 
   const result = await client.getObjects({
     objectIds: ids,
+
     include: {
       json: true,
     },
   });
 
   return (result.objects ?? [])
+
     .filter((object) => !(object instanceof Error))
+
     .map((object) => ({
       objectId: object.objectId,
+
       ...object.json,
     }));
+}
+
+const MESSAGE_EVENT = `${MARKETPLACE_PACKAGE_ID}::${MODULE}::MessageSent`;
+
+export async function getProductMessages(productId, participantAddress) {
+  if (!productId || !participantAddress) {
+    return [];
+  }
+
+  const targetProduct = productId.toLowerCase();
+
+  const participant = participantAddress.toLowerCase();
+
+  const messageIds = new Set();
+
+  let page = await client.listEvents({
+    filter: {
+      eventType: MESSAGE_EVENT,
+    },
+
+    order: "descending",
+
+    limit: 50,
+  });
+
+  while (true) {
+    for (const event of page.events ?? []) {
+      const data = event.json;
+
+      if (
+        data?.product?.toLowerCase() === targetProduct &&
+        (data?.buyer?.toLowerCase() === participant ||
+          data?.seller?.toLowerCase() === participant) &&
+        data?.message_id
+      ) {
+        messageIds.add(data.message_id);
+      }
+    }
+
+    if (!page.hasNextPage || !page.endCursor) {
+      break;
+    }
+
+    page = await client.listEvents({
+      filter: {
+        eventType: MESSAGE_EVENT,
+      },
+
+      order: "descending",
+
+      before: page.endCursor,
+
+      limit: 50,
+    });
+  }
+
+  const ids = [...messageIds];
+
+  if (ids.length === 0) {
+    return [];
+  }
+
+  const result = await client.getObjects({
+    objectIds: ids,
+
+    include: {
+      json: true,
+    },
+  });
+
+  return (result.objects ?? [])
+
+    .filter((object) => !(object instanceof Error))
+
+    .map((object) => ({
+      objectId: object.objectId,
+
+      ...object.json,
+    }))
+
+    .filter(
+      (message) =>
+        message.product?.toLowerCase() === targetProduct &&
+        (message.buyer?.toLowerCase() === participant ||
+          message.seller?.toLowerCase() === participant)
+    )
+
+    .sort((a, b) => Number(a.created_at ?? 0) - Number(b.created_at ?? 0));
+}
+
+export async function getSellerProductMessages(sellerAddress) {
+  if (!sellerAddress) {
+    return [];
+  }
+
+  const seller = sellerAddress.toLowerCase();
+
+  const messageIds = new Set();
+
+  let page = await client.listEvents({
+    filter: {
+      eventType: MESSAGE_EVENT,
+    },
+
+    order: "descending",
+
+    limit: 50,
+  });
+
+  while (true) {
+    for (const event of page.events ?? []) {
+      const data = event.json;
+
+      if (data?.seller?.toLowerCase() === seller && data?.message_id) {
+        messageIds.add(data.message_id);
+      }
+    }
+
+    if (!page.hasNextPage || !page.endCursor) {
+      break;
+    }
+
+    page = await client.listEvents({
+      filter: {
+        eventType: MESSAGE_EVENT,
+      },
+
+      order: "descending",
+
+      before: page.endCursor,
+
+      limit: 50,
+    });
+  }
+
+  const ids = [...messageIds];
+
+  if (ids.length === 0) {
+    return [];
+  }
+
+  const result = await client.getObjects({
+    objectIds: ids,
+
+    include: {
+      json: true,
+    },
+  });
+
+  return (result.objects ?? [])
+
+    .filter((object) => !(object instanceof Error))
+
+    .map((object) => ({
+      objectId: object.objectId,
+
+      ...object.json,
+    }))
+
+    .filter((message) => message.seller?.toLowerCase() === seller)
+
+    .sort((a, b) => Number(a.created_at ?? 0) - Number(b.created_at ?? 0));
+}
+// V2 buyer-funded offers are shared objects, discovered from creation events.
+
+const PURCHASE_OFFER_PACKAGES = [
+  "0x21c1d7862ae5987e030a2d66dac095bc53d760e612e7b0326e82ba29ae5c761f",
+  MARKETPLACE_LATEST_PACKAGE_ID,
+].filter(Boolean);
+
+export async function getPurchaseOffers() {
+  const ids = new Set();
+
+  for (const packageId of new Set(PURCHASE_OFFER_PACKAGES)) {
+    const eventType = `${packageId}::${MODULE}::PurchaseOfferCreated`;
+
+    let cursor;
+
+    do {
+      const page = await client.listEvents({
+        filter: { eventType },
+        order: "descending",
+        limit: 50,
+        ...(cursor ? { before: cursor } : {}),
+      });
+
+      for (const event of page.events ?? []) {
+        if (event.json?.offer_id) {
+          ids.add(event.json.offer_id);
+        }
+      }
+
+      if (!page.hasNextPage || !page.endCursor) break;
+      cursor = page.endCursor;
+    } while (true);
+  }
+
+  const all = [...ids];
+  const offers = [];
+
+  for (let i = 0; i < all.length; i += 50) {
+    const result = await client.getObjects({
+      objectIds: all.slice(i, i + 50),
+      include: { json: true },
+    });
+
+    offers.push(
+      ...(result.objects ?? [])
+        .filter((object) => object && !(object instanceof Error) && object.json)
+        .map((object) => ({
+          objectId: object.objectId,
+          ...object.json,
+        }))
+    );
+  }
+
+  return await Promise.all(
+    offers.map(async (offer) => {
+      if (!offer.rejected) {
+        return { ...offer, refunded: false };
+      }
+
+      try {
+        const refunded = await getEscrowRefundStatus(offer.escrow);
+        return { ...offer, refunded };
+      } catch (error) {
+        console.error("Failed to check escrow refund:", error);
+
+        return {
+          ...offer,
+          refunded: false,
+          refundStatusUnknown: true,
+        };
+      }
+    })
+  );
+}
+
+export async function getBuyerPurchaseOffers(address) {
+  if (!address) return [];
+  return (await getPurchaseOffers()).filter(
+    (offer) => offer.buyer?.toLowerCase() === address.toLowerCase()
+  );
+}
+
+export async function getSellerPurchaseOffers(address) {
+  if (!address) return [];
+  return (await getPurchaseOffers()).filter(
+    (offer) => offer.seller?.toLowerCase() === address.toLowerCase()
+  );
+}
+
+export async function getEscrowRefundStatus(escrowId) {
+  if (!escrowId) return false;
+
+  const result = await client.getObject({
+    objectId: escrowId,
+    include: { json: true },
+  });
+
+  const escrow = result.object?.json;
+
+  if (!escrow) {
+    throw new Error("Escrow object could not be loaded.");
+  }
+
+  // STATUS_CANCELLED = 4
+  return Number(escrow.status) === 4;
 }

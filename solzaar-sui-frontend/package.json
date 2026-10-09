@@ -4,8 +4,11 @@
   "version": "0.1.0",
   "type": "module",
   "scripts": {
-    "dev": "vite",
+    "dev": "vite --mode devnet",
+    "dev-mainnet": "vite --mode mainnet",
     "build": "vite build",
+    "build-devnet": "vite build --mode devnet",
+    "build-mainnet": "vite build --mode mainnet",
     "preview": "vite preview"
   },
   "dependencies": {

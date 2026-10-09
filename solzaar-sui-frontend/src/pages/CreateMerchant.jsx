@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import {
   useCurrentAccount,
@@ -32,14 +33,14 @@ export default function CreateMerchant() {
     bannerUri: "",
     shipsFrom: "",
     preferredContact: "",
-    sellerDepositBps: "1000",
+    sellerDepositPercent: "10",
   });
 
   const set = (key, value) => {
-    setF({
-      ...f,
+    setF((prev) => ({
+      ...prev,
       [key]: value,
-    });
+    }));
   };
 
   async function go(e) {
@@ -50,12 +51,37 @@ export default function CreateMerchant() {
       return;
     }
 
+    const percentText = f.sellerDepositPercent.trim();
+    const percent = Number(percentText);
+    const bps = percent * 100;
+
+    if (
+      percentText === "" ||
+      !Number.isFinite(percent) ||
+      percent < 0 ||
+      percent > 100 ||
+      !Number.isInteger(bps)
+    ) {
+      setMsg(
+        "Enter a valid seller deposit percentage between 0% and 100%, with up to two decimal places."
+      );
+      return;
+    }
+
     try {
       setBusy(true);
       setMsg("Waiting for wallet confirmation...");
 
+      // Convert percentage to basis points for Move contract.
+      const merchantData = {
+        ...f,
+        sellerDepositBps: Math.round(bps),
+      };
+
+      delete merchantData.sellerDepositPercent;
+
       const result = await dAppKit.signAndExecuteTransaction({
-        transaction: createMerchantTx(f),
+        transaction: createMerchantTx(merchantData),
       });
 
       if (result.FailedTransaction) {
@@ -87,7 +113,6 @@ export default function CreateMerchant() {
     bannerUri: "Banner URI",
     shipsFrom: "Ships from",
     preferredContact: "Preferred contact",
-    sellerDepositBps: "Seller deposit BPS",
   };
 
   return (
@@ -104,6 +129,28 @@ export default function CreateMerchant() {
           />
         </label>
       ))}
+
+      <label style={field}>
+        Seller Security Deposit (%)
+
+        <input
+          type="number"
+          min="0"
+          max="100"
+          step="0.01"
+          value={f.sellerDepositPercent}
+          onChange={(e) =>
+            set("sellerDepositPercent", e.target.value)
+          }
+          required
+        />
+
+        <small>
+          Percentage of the order value required as the
+          seller's security deposit. Example: 10% means
+          a 0.01 SUI deposit for a 0.1 SUI order.
+        </small>
+      </label>
 
       <button disabled={!account || busy}>
         {busy ? "Creating..." : "Create Merchant"}

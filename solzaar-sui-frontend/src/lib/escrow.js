@@ -10,9 +10,20 @@ import {
   MODULE,
 } from "../config";
 
+const NETWORK = import.meta.env.VITE_SUI_NETWORK || "devnet";
+
+const GRPC_URLS = {
+  devnet: "https://fullnode.devnet.sui.io:443",
+  mainnet: "https://fullnode.mainnet.sui.io:443",
+};
+
+if (!GRPC_URLS[NETWORK]) {
+  throw new Error(`Unsupported Sui network: ${NETWORK}`);
+}
+
 const client = new SuiGrpcClient({
-  network: "devnet",
-  baseUrl: "https://fullnode.devnet.sui.io:443",
+  network: NETWORK,
+  baseUrl: GRPC_URLS[NETWORK],
 });
 
 export const ESCROW_STATUS = {

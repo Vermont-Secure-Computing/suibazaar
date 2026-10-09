@@ -97,10 +97,7 @@ export default function WalletButton() {
     } catch (err) {
       console.error("Wallet connection failed:", err);
 
-      setError(
-        err?.message ||
-          "Unable to connect wallet. Please try again."
-      );
+      setError(err?.message || "Unable to connect wallet. Please try again.");
     } finally {
       setConnecting(null);
     }
@@ -132,35 +129,20 @@ export default function WalletButton() {
   };
 
   const installWallet = (url) => {
-    window.open(
-      url,
-      "_blank",
-      "noopener,noreferrer"
-    );
+    window.open(url, "_blank", "noopener,noreferrer");
   };
 
-  const catalogWallets = WALLET_CATALOG.map(
-    (catalogWallet) => ({
-      ...catalogWallet,
+  const catalogWallets = WALLET_CATALOG.map((catalogWallet) => ({
+    ...catalogWallet,
 
-      detectedWallet: findDetectedWallet(
-        catalogWallet,
-        wallets
-      ),
-    })
-  );
+    detectedWallet: findDetectedWallet(catalogWallet, wallets),
+  }));
 
-  const extraDetectedWallets = wallets.filter(
-    (wallet) => {
-      return !WALLET_CATALOG.some(
-        (catalogWallet) =>
-          findDetectedWallet(
-            catalogWallet,
-            [wallet]
-          )
-      );
-    }
-  );
+  const extraDetectedWallets = wallets.filter((wallet) => {
+    return !WALLET_CATALOG.some((catalogWallet) =>
+      findDetectedWallet(catalogWallet, [wallet])
+    );
+  });
 
   /*
    * CONNECTED
@@ -171,9 +153,7 @@ export default function WalletButton() {
         <button
           type="button"
           className="custom-wallet-button"
-          onClick={() =>
-            setShowAccountMenu(!showAccountMenu)
-          }
+          onClick={() => setShowAccountMenu(!showAccountMenu)}
         >
           {currentWallet?.icon && (
             <img
@@ -183,13 +163,9 @@ export default function WalletButton() {
             />
           )}
 
-          <span>
-            {shortAddress(account.address)}
-          </span>
+          <span>{shortAddress(account.address)}</span>
 
-          <span className="custom-wallet-arrow">
-            ▾
-          </span>
+          <span className="custom-wallet-arrow">▾</span>
         </button>
 
         {showAccountMenu &&
@@ -197,9 +173,7 @@ export default function WalletButton() {
             <>
               <div
                 className="wallet-menu-backdrop"
-                onClick={() =>
-                  setShowAccountMenu(false)
-                }
+                onClick={() => setShowAccountMenu(false)}
               />
 
               <div className="custom-account-menu">
@@ -214,19 +188,19 @@ export default function WalletButton() {
                     )}
 
                     <div>
-                      <strong>
-                        {currentWallet?.name ||
-                          "Sui Wallet"}
-                      </strong>
+                      <strong>{currentWallet?.name || "Sui Wallet"}</strong>
 
-                      <small>Sui Devnet</small>
+                      <small>
+                        Sui{" "}
+                        {import.meta.env.VITE_SUI_NETWORK === "mainnet"
+                          ? "Mainnet"
+                          : "Devnet"}
+                      </small>
                     </div>
                   </div>
 
                   <div className="custom-account-address">
-                    {shortAddress(
-                      account.address
-                    )}
+                    {shortAddress(account.address)}
                   </div>
                 </div>
 
@@ -235,9 +209,7 @@ export default function WalletButton() {
                   className="custom-account-action"
                   onClick={copyAddress}
                 >
-                  {copied
-                    ? "✓ Address copied"
-                    : "Copy address"}
+                  {copied ? "✓ Address copied" : "Copy address"}
                 </button>
 
                 <button
@@ -275,119 +247,88 @@ export default function WalletButton() {
         createPortal(
           <div
             className="wallet-modal-overlay"
-            onClick={() =>
-              setShowModal(false)
-            }
+            onClick={() => setShowModal(false)}
           >
             <div
               className="wallet-modal-box"
-              onClick={(event) =>
-                event.stopPropagation()
-              }
+              onClick={(event) => event.stopPropagation()}
             >
               <div className="wallet-modal-header">
                 <div>
                   <h2>Connect Wallet</h2>
 
-                  <p>
-                    Choose a wallet to connect
-                    to Solzaar
-                  </p>
+                  <p>Choose a wallet to connect to Solzaar</p>
                 </div>
 
                 <button
                   type="button"
                   className="wallet-modal-close"
-                  onClick={() =>
-                    setShowModal(false)
-                  }
+                  onClick={() => setShowModal(false)}
                 >
                   ×
                 </button>
               </div>
 
               <div className="wallet-modal-list">
-                {catalogWallets.map(
-                  (wallet) => {
-                    const detected =
-                      wallet.detectedWallet;
+                {catalogWallets.map((wallet) => {
+                  const detected = wallet.detectedWallet;
 
-                    const isConnecting =
-                      connecting ===
-                      detected?.name;
+                  const isConnecting = connecting === detected?.name;
 
-                    return (
-                      <button
-                        key={wallet.id}
-                        type="button"
-                        className="wallet-modal-item"
-                        disabled={
-                          connecting !==
-                            null &&
-                          !isConnecting
+                  return (
+                    <button
+                      key={wallet.id}
+                      type="button"
+                      className="wallet-modal-item"
+                      disabled={connecting !== null && !isConnecting}
+                      onClick={() => {
+                        if (detected) {
+                          connectWallet(detected);
+                        } else {
+                          installWallet(wallet.installUrl);
                         }
-                        onClick={() => {
-                          if (detected) {
-                            connectWallet(
-                              detected
-                            );
-                          } else {
-                            installWallet(
-                              wallet.installUrl
-                            );
-                          }
-                        }}
-                      >
-                        <div className="wallet-modal-info">
-                          {detected?.icon ? (
-                            <img
-                              src={
-                                detected.icon
-                              }
-                              alt=""
-                              className="wallet-modal-icon"
-                            />
-                          ) : (
-                            <div className="wallet-modal-placeholder">
-                              {wallet.name
-                                .charAt(0)
-                                .toUpperCase()}
-                            </div>
-                          )}
-
-                          <div>
-                            <strong>
-                              {wallet.name}
-                            </strong>
-
-                            <small>
-                              {detected
-                                ? "Installed"
-                                : "Not installed"}
-                            </small>
+                      }}
+                    >
+                      <div className="wallet-modal-info">
+                        {detected?.icon ? (
+                          <img
+                            src={detected.icon}
+                            alt=""
+                            className="wallet-modal-icon"
+                          />
+                        ) : (
+                          <div className="wallet-modal-placeholder">
+                            {wallet.name.charAt(0).toUpperCase()}
                           </div>
+                        )}
+
+                        <div>
+                          <strong>{wallet.name}</strong>
+
+                          <small>
+                            {detected ? "Installed" : "Not installed"}
+                          </small>
                         </div>
+                      </div>
 
-                        <span
-                          className={
-                            detected
-                              ? "wallet-connect-action"
-                              : "wallet-install-action"
-                          }
-                        >
-                          {isConnecting
-                            ? "Connecting..."
-                            : detected
-                              ? "Connect"
-                              : "Install ↗"}
-                        </span>
-                      </button>
-                    );
-                  }
-                )}
+                      <span
+                        className={
+                          detected
+                            ? "wallet-connect-action"
+                            : "wallet-install-action"
+                        }
+                      >
+                        {isConnecting
+                          ? "Connecting..."
+                          : detected
+                          ? "Connect"
+                          : "Install ↗"}
+                      </span>
+                    </button>
+                  );
+                })}
 
-                {extraDetectedWallets.length >
-                  0 && (
+                {extraDetectedWallets.length > 0 && (
                   <>
                     <div className="wallet-list-divider" />
 
@@ -395,73 +336,49 @@ export default function WalletButton() {
                       Other detected wallets
                     </div>
 
-                    {extraDetectedWallets.map(
-                      (wallet) => (
-                        <button
-                          key={wallet.name}
-                          type="button"
-                          className="wallet-modal-item"
-                          disabled={
-                            connecting !==
-                            null
-                          }
-                          onClick={() =>
-                            connectWallet(
-                              wallet
-                            )
-                          }
-                        >
-                          <div className="wallet-modal-info">
-                            {wallet.icon ? (
-                              <img
-                                src={
-                                  wallet.icon
-                                }
-                                alt=""
-                                className="wallet-modal-icon"
-                              />
-                            ) : (
-                              <div className="wallet-modal-placeholder">
-                                {wallet.name
-                                  .charAt(0)
-                                  .toUpperCase()}
-                              </div>
-                            )}
-
-                            <div>
-                              <strong>
-                                {wallet.name}
-                              </strong>
-
-                              <small>
-                                Installed
-                              </small>
+                    {extraDetectedWallets.map((wallet) => (
+                      <button
+                        key={wallet.name}
+                        type="button"
+                        className="wallet-modal-item"
+                        disabled={connecting !== null}
+                        onClick={() => connectWallet(wallet)}
+                      >
+                        <div className="wallet-modal-info">
+                          {wallet.icon ? (
+                            <img
+                              src={wallet.icon}
+                              alt=""
+                              className="wallet-modal-icon"
+                            />
+                          ) : (
+                            <div className="wallet-modal-placeholder">
+                              {wallet.name.charAt(0).toUpperCase()}
                             </div>
-                          </div>
+                          )}
 
-                          <span className="wallet-connect-action">
-                            {connecting ===
-                            wallet.name
-                              ? "Connecting..."
-                              : "Connect"}
-                          </span>
-                        </button>
-                      )
-                    )}
+                          <div>
+                            <strong>{wallet.name}</strong>
+
+                            <small>Installed</small>
+                          </div>
+                        </div>
+
+                        <span className="wallet-connect-action">
+                          {connecting === wallet.name
+                            ? "Connecting..."
+                            : "Connect"}
+                        </span>
+                      </button>
+                    ))}
                   </>
                 )}
 
-                {error && (
-                  <div className="wallet-modal-error">
-                    {error}
-                  </div>
-                )}
+                {error && <div className="wallet-modal-error">{error}</div>}
               </div>
 
               <div className="wallet-modal-footer">
-                Never share your recovery
-                phrase with Solzaar or any
-                website.
+                Never share your recovery phrase with Solzaar or any website.
               </div>
             </div>
           </div>,

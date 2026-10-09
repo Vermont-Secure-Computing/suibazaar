@@ -30,3 +30,14 @@ dist/
 *.FULL-BACKUP
 *.FULL-BACKUP2
 *.backup-shared
+
+# Move build artifacts
+target/
+**/target/
+
+# Private keys
+*.pem
+*.key
+*.keystore
+keypair.json
+id.json

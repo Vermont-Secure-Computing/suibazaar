@@ -135,3 +135,46 @@ export function submitReviewTx({
 
   return tx;
 }
+
+export function sendProductMessageTx({
+  productId,
+  buyer,
+  message,
+}) {
+  need();
+
+  if (!productId) {
+    throw new Error("Product object ID is required.");
+  }
+
+  if (!buyer) {
+    throw new Error("Buyer address is required.");
+  }
+
+  const text = String(message ?? "").trim();
+
+  if (!text) {
+    throw new Error("Message cannot be empty.");
+  }
+
+  if (new TextEncoder().encode(text).length > 280) {
+    throw new Error("Message must be 280 bytes or less.");
+  }
+
+  const tx = new Transaction();
+
+  tx.moveCall({
+    target:
+      `${MARKETPLACE_LATEST_PACKAGE_ID}` +
+      `::${MODULE}::send_product_message`,
+
+    arguments: [
+      tx.object(productId),
+      tx.pure.address(buyer),
+      tx.pure.string(text),
+      tx.object(CLOCK_ID),
+    ],
+  });
+
+  return tx;
+}

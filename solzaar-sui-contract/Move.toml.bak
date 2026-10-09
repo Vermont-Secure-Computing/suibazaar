@@ -1,0 +1,10 @@
+[package]
+name = "solzaar_sui"
+edition = "2024"
+published-at = "0xeff7599f193bfdca54dc90d29faff89adb27b91db47d2e152fda5cb49219547c"
+
+[dependencies]
+escrow = { local = "../../simple_sui_escrow/escrow_contract" }
+
+[environments]
+devnet = "945654c4"

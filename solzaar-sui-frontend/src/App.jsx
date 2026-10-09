@@ -14,7 +14,7 @@ export default function App() {
     <>
       <header className="app-header">
         <Link className="brand" to="/">
-          Solzaar
+          Suizaar
         </Link>
 
         <nav>
@@ -25,7 +25,12 @@ export default function App() {
         </nav>
 
         <div className="wallet">
-          <span>Sui Devnet</span>
+          <span>
+            Sui{" "}
+            {import.meta.env.VITE_SUI_NETWORK === "mainnet"
+              ? "Mainnet"
+              : "Devnet"}
+          </span>
           <WalletButton />
         </div>
       </header>

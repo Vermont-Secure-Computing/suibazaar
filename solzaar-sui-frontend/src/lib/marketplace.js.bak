@@ -1,0 +1,1229 @@
+import { SuiGrpcClient } from "@mysten/sui/grpc";
+
+import { MARKETPLACE_PACKAGE_ID, MARKETPLACE_LATEST_PACKAGE_ID, ESCROW_PACKAGE_ID, MODULE } from "../config";
+
+
+
+const NETWORK = import.meta.env.VITE_SUI_NETWORK || "devnet";
+
+
+
+const GRPC_URLS = {
+
+  devnet: "https\://fullnode.devnet.sui.io:443",
+
+  mainnet: "https\://fullnode.mainnet.sui.io:443",
+
+};
+
+
+
+if (!GRPC_URLS[NETWORK]) {
+
+  throw new Error(`Unsupported Sui network: ${NETWORK}`);
+
+}
+
+
+
+const client = new SuiGrpcClient({
+
+  network: NETWORK,
+
+  baseUrl: GRPC_URLS[NETWORK],
+
+});
+
+
+
+const MERCHANT_EVENT = `${MARKETPLACE_PACKAGE_ID}::${MODULE}::MerchantCreated`;
+
+
+
+export async function getMerchants() {
+
+  if (!MARKETPLACE_PACKAGE_ID) {
+
+    throw new Error("VITE_MARKETPLACE_PACKAGE_ID is not set.");
+
+  }
+
+
+
+  const merchantIds = new Set();
+
+
+
+  let page = await client.listEvents({
+
+    filter: {
+
+      eventType: MERCHANT_EVENT,
+
+    },
+
+    order: "descending",
+
+    limit: 50,
+
+  });
+
+
+
+  while (true) {
+
+    for (const event of page.events ?? []) {
+
+      const id = event.json?.merchant_id;
+
+
+
+      if (id) {
+
+        merchantIds.add(id);
+
+      }
+
+    }
+
+
+
+    if (!page.hasNextPage || !page.endCursor) {
+
+      break;
+
+    }
+
+
+
+    page = await client.listEvents({
+
+      filter: {
+
+        eventType: MERCHANT_EVENT,
+
+      },
+
+      before: page.endCursor,
+
+      limit: 50,
+
+    });
+
+  }
+
+
+
+  const ids = [...merchantIds];
+
+
+
+  if (ids.length === 0) {
+
+    return [];
+
+  }
+
+
+
+  const result = await client.getObjects({
+
+    objectIds: ids,
+
+    include: {
+
+      json: true,
+
+    },
+
+  });
+
+
+
+  return (result.objects ?? [])
+
+    .filter((object) => !(object instanceof Error))
+
+    .map((object) => ({
+
+      objectId: object.objectId,
+
+      ...object.json,
+
+    }))
+
+    .filter((merchant) => merchant.active !== false);
+
+}
+
+
+
+export async function getMerchant(objectId) {
+
+  const result = await client.getObject({
+
+    objectId,
+
+    include: {
+
+      json: true,
+
+    },
+
+  });
+
+
+
+  return {
+
+    objectId: result.object.objectId,
+
+    ...result.object.json,
+
+  };
+
+}
+
+
+
+export async function getMerchantByOwner(owner) {
+
+  if (!owner) return null;
+
+
+
+  const type = `${MARKETPLACE_PACKAGE_ID}::${MODULE}::MerchantProfile`;
+
+
+
+  const result = await client.listOwnedObjects({
+
+    owner,
+
+    type,
+
+    include: {
+
+      json: true,
+
+    },
+
+  });
+
+
+
+  const object = (result.objects ?? []).find(
+
+    (item) => item.json?.active !== false
+
+  );
+
+
+
+  if (!object) {
+
+    return null;
+
+  }
+
+
+
+  return {
+
+    objectId: object.objectId,
+
+    ...object.json,
+
+  };
+
+}
+
+
+
+export async function getProductsByMerchant(merchantAddress) {
+
+  if (!merchantAddress) return [];
+
+
+
+  const eventType = `${MARKETPLACE_PACKAGE_ID}::${MODULE}::ProductCreated`;
+
+
+
+  const productIds = new Set();
+
+
+
+  let page = await client.listEvents({
+
+    filter: {
+
+      eventType,
+
+    },
+
+    order: "descending",
+
+    limit: 50,
+
+  });
+
+
+
+  while (true) {
+
+    for (const event of page.events ?? []) {
+
+      const data = event.json;
+
+
+
+      if (data?.merchant?.toLowerCase() === merchantAddress.toLowerCase()) {
+
+        if (data.product_object_id) {
+
+          productIds.add(data.product_object_id);
+
+        }
+
+      }
+
+    }
+
+
+
+    if (!page.hasNextPage || !page.endCursor) {
+
+      break;
+
+    }
+
+
+
+    page = await client.listEvents({
+
+      filter: {
+
+        eventType,
+
+      },
+
+      before: page.endCursor,
+
+      limit: 50,
+
+    });
+
+  }
+
+
+
+  const ids = [...productIds];
+
+
+
+  if (ids.length === 0) {
+
+    return [];
+
+  }
+
+
+
+  const result = await client.getObjects({
+
+    objectIds: ids,
+
+    include: {
+
+      json: true,
+
+    },
+
+  });
+
+
+
+  return (result.objects ?? [])
+
+    .filter((object) => !(object instanceof Error))
+
+    .map((object) => ({
+
+      objectId: object.objectId,
+
+      ...object.json,
+
+    }))
+
+    .filter((product) => product.deleted !== true && product.active !== false);
+
+}
+
+
+
+export async function getProduct(objectId) {
+
+  if (!objectId) {
+
+    throw new Error("Product object ID is required.");
+
+  }
+
+
+
+  const result = await client.getObject({
+
+    objectId,
+
+    include: {
+
+      json: true,
+
+    },
+
+  });
+
+
+
+  return {
+
+    objectId: result.object.objectId,
+
+    ...result.object.json,
+
+  };
+
+}
+
+
+
+export async function getMerchantByAuthority(authority) {
+
+  if (!authority) return null;
+
+
+
+  const merchants = await getMerchants();
+
+
+
+  return (
+
+    merchants.find(
+
+      (merchant) =>
+
+        merchant.authority?.toLowerCase() === authority.toLowerCase()
+
+    ) ?? null
+
+  );
+
+}
+
+
+
+export async function getEscrowCreatedByDigest(digest) {
+
+  const eventType = `${ESCROW_PACKAGE_ID}::escrow::EscrowCreated`;
+
+
+
+  const result = await client.listEvents({
+
+    filter: {
+
+      eventType,
+
+    },
+
+    order: "descending",
+
+    limit: 50,
+
+  });
+
+
+
+  const event = (result.events ?? []).find(
+
+    (item) =>
+
+      item.transactionDigest === digest || item.transaction?.digest === digest
+
+  );
+
+
+
+  if (!event?.json?.escrow_id) {
+
+    throw new Error("Escrow was created but its object ID could not be found.");
+
+  }
+
+
+
+  return event.json.escrow_id;
+
+}
+
+
+
+const ORDER_EVENTS = [...new Set([
+  `${MARKETPLACE_PACKAGE_ID}::${MODULE}::OrderCreated`,
+  `${MARKETPLACE_LATEST_PACKAGE_ID}::${MODULE}::OrderCreated`,
+])];
+
+export async function getOrderRecord(objectId) {
+
+  if (!objectId) {
+
+    throw new Error("Order record object ID is required.");
+
+  }
+
+
+
+  const result = await client.getObject({
+
+    objectId,
+
+    include: {
+
+      json: true,
+
+    },
+
+  });
+
+
+
+  if (!result?.object) {
+
+    return null;
+
+  }
+
+
+
+  return {
+
+    objectId: result.object.objectId,
+
+    ...result.object.json,
+
+  };
+
+}
+
+
+
+export async function getOrderRecords() {
+
+  if (!MARKETPLACE_PACKAGE_ID) {
+
+    throw new Error("VITE_MARKETPLACE_PACKAGE_ID is not set.");
+
+  }
+
+
+
+  const orderIds = new Set();
+  for (const eventType of ORDER_EVENTS) {
+    let cursor;
+    do {
+      const page = await client.listEvents({
+        filter: { eventType },
+        order: "descending",
+        limit: 50,
+        ...(cursor ? { before: cursor } : {}),
+      });
+      for (const event of page.events ?? []) {
+        if (event.json?.order_id) orderIds.add(event.json.order_id);
+      }
+      if (!page.hasNextPage || !page.endCursor) break;
+      cursor = page.endCursor;
+    } while (true);
+  }
+
+  const ids = [...orderIds];
+
+
+
+  if (ids.length === 0) {
+
+    return [];
+
+  }
+
+
+
+  const orders = [];
+  for (let i = 0; i < ids.length; i += 50) {
+    const result = await client.getObjects({
+      objectIds: ids.slice(i, i + 50),
+      include: { json: true },
+    });
+    orders.push(...(result.objects ?? [])
+      .filter((object) => object && !(object instanceof Error) && object.json)
+      .map((object) => ({ objectId: object.objectId, ...object.json })));
+  }
+  return orders;
+}
+
+
+
+export async function getBuyerOrderRecords(buyerAddress) {
+
+  if (!buyerAddress) return [];
+
+
+
+  const orders = await getOrderRecords();
+
+  const buyer = buyerAddress.toLowerCase();
+
+
+
+  return orders.filter((order) => order.buyer?.toLowerCase() === buyer);
+
+}
+
+
+
+export async function getSellerOrderRecords(sellerAddress) {
+
+  if (!sellerAddress) return [];
+
+
+
+  const orders = await getOrderRecords();
+
+  const seller = sellerAddress.toLowerCase();
+
+
+
+  return orders.filter((order) => order.seller?.toLowerCase() === seller);
+
+}
+
+
+
+export async function getOrderRecordByEscrow(escrowId) {
+
+  if (!escrowId) return null;
+
+
+
+  const orders = await getOrderRecords();
+
+  const target = escrowId.toLowerCase();
+
+
+
+  return orders.find((order) => order.escrow?.toLowerCase() === target) ?? null;
+
+}
+
+
+
+const REPUTATION_EVENT =
+
+  `${MARKETPLACE_PACKAGE_ID}::${MODULE}::ReputationCreated`;
+
+
+
+export async function getMerchantReputation(merchantAddress) {
+
+  if (!merchantAddress) return null;
+
+
+
+  const target = merchantAddress.toLowerCase();
+
+
+
+  let page = await client.listEvents({
+
+    filter: {
+
+      eventType: REPUTATION_EVENT,
+
+    },
+
+    order: "descending",
+
+    limit: 50,
+
+  });
+
+
+
+  while (true) {
+
+    for (const event of page.events ?? []) {
+
+      const data = event.json;
+
+
+
+      if (
+
+        data?.merchant?.toLowerCase() === target &&
+
+        data?.reputation_id
+
+      ) {
+
+        const result = await client.getObject({
+
+          objectId: data.reputation_id,
+
+          include: {
+
+            json: true,
+
+          },
+
+        });
+
+
+
+        if (!result?.object) {
+
+          return null;
+
+        }
+
+
+
+        return {
+
+          objectId: result.object.objectId,
+
+          ...result.object.json,
+
+        };
+
+      }
+
+    }
+
+
+
+    if (!page.hasNextPage || !page.endCursor) {
+
+      break;
+
+    }
+
+
+
+    page = await client.listEvents({
+
+      filter: {
+
+        eventType: REPUTATION_EVENT,
+
+      },
+
+      before: page.endCursor,
+
+      limit: 50,
+
+    });
+
+  }
+
+
+
+  return null;
+
+}
+
+
+
+const REVIEW_EVENT =
+
+  `${MARKETPLACE_PACKAGE_ID}::${MODULE}::ReviewCreated`;
+
+
+
+export async function getProductReviews(productId) {
+
+  if (!productId) return [];
+
+
+
+  const target = productId.toLowerCase();
+
+  const reviewIds = new Set();
+
+
+
+  let page = await client.listEvents({
+
+    filter: {
+
+      eventType: REVIEW_EVENT,
+
+    },
+
+    order: "descending",
+
+    limit: 50,
+
+  });
+
+
+
+  while (true) {
+
+    for (const event of page.events ?? []) {
+
+      const data = event.json;
+
+
+
+      if (
+
+        data?.product_id?.toLowerCase() === target &&
+
+        data?.review_id
+
+      ) {
+
+        reviewIds.add(data.review_id);
+
+      }
+
+    }
+
+
+
+    if (!page.hasNextPage || !page.endCursor) {
+
+      break;
+
+    }
+
+
+
+    page = await client.listEvents({
+
+      filter: {
+
+        eventType: REVIEW_EVENT,
+
+      },
+
+      before: page.endCursor,
+
+      limit: 50,
+
+    });
+
+  }
+
+
+
+  const ids = [...reviewIds];
+
+
+
+  if (ids.length === 0) {
+
+    return [];
+
+  }
+
+
+
+  const result = await client.getObjects({
+
+    objectIds: ids,
+
+    include: {
+
+      json: true,
+
+    },
+
+  });
+
+
+
+  return (result.objects ?? [])
+
+    .filter((object) => !(object instanceof Error))
+
+    .map((object) => ({
+
+      objectId: object.objectId,
+
+      ...object.json,
+
+    }));
+
+}
+
+
+
+const MESSAGE_EVENT =
+
+  `${MARKETPLACE_PACKAGE_ID}::${MODULE}::MessageSent`;
+
+
+
+export async function getProductMessages(productId, participantAddress) {
+
+  if (!productId || !participantAddress) {
+
+    return [];
+
+  }
+
+
+
+  const targetProduct = productId.toLowerCase();
+
+  const participant = participantAddress.toLowerCase();
+
+  const messageIds = new Set();
+
+
+
+  let page = await client.listEvents({
+
+    filter: {
+
+      eventType: MESSAGE_EVENT,
+
+    },
+
+    order: "descending",
+
+    limit: 50,
+
+  });
+
+
+
+  while (true) {
+
+    for (const event of page.events ?? []) {
+
+      const data = event.json;
+
+
+
+      if (
+
+        data?.product?.toLowerCase() === targetProduct &&
+
+        (
+
+          data?.buyer?.toLowerCase() === participant ||
+
+          data?.seller?.toLowerCase() === participant
+
+        ) &&
+
+        data?.message_id
+
+      ) {
+
+        messageIds.add(data.message_id);
+
+      }
+
+    }
+
+
+
+    if (!page.hasNextPage || !page.endCursor) {
+
+      break;
+
+    }
+
+
+
+    page = await client.listEvents({
+
+      filter: {
+
+        eventType: MESSAGE_EVENT,
+
+      },
+
+      order: "descending",
+
+      before: page.endCursor,
+
+      limit: 50,
+
+    });
+
+  }
+
+
+
+  const ids = [...messageIds];
+
+
+
+  if (ids.length === 0) {
+
+    return [];
+
+  }
+
+
+
+  const result = await client.getObjects({
+
+    objectIds: ids,
+
+    include: {
+
+      json: true,
+
+    },
+
+  });
+
+
+
+  return (result.objects ?? [])
+
+    .filter((object) => !(object instanceof Error))
+
+    .map((object) => ({
+
+      objectId: object.objectId,
+
+      ...object.json,
+
+    }))
+
+    .filter(
+
+      (message) =>
+
+        message.product?.toLowerCase() === targetProduct &&
+
+        (
+
+          message.buyer?.toLowerCase() === participant ||
+
+          message.seller?.toLowerCase() === participant
+
+        )
+
+    )
+
+    .sort(
+
+      (a, b) =>
+
+        Number(a.created_at ?? 0) - Number(b.created_at ?? 0)
+
+    );
+
+}
+
+
+
+export async function getSellerProductMessages(sellerAddress) {
+
+  if (!sellerAddress) {
+
+    return [];
+
+  }
+
+
+
+  const seller = sellerAddress.toLowerCase();
+
+  const messageIds = new Set();
+
+
+
+  let page = await client.listEvents({
+
+    filter: {
+
+      eventType: MESSAGE_EVENT,
+
+    },
+
+    order: "descending",
+
+    limit: 50,
+
+  });
+
+
+
+  while (true) {
+
+    for (const event of page.events ?? []) {
+
+      const data = event.json;
+
+
+
+      if (
+
+        data?.seller?.toLowerCase() === seller &&
+
+        data?.message_id
+
+      ) {
+
+        messageIds.add(data.message_id);
+
+      }
+
+    }
+
+
+
+    if (!page.hasNextPage || !page.endCursor) {
+
+      break;
+
+    }
+
+
+
+    page = await client.listEvents({
+
+      filter: {
+
+        eventType: MESSAGE_EVENT,
+
+      },
+
+      order: "descending",
+
+      before: page.endCursor,
+
+      limit: 50,
+
+    });
+
+  }
+
+
+
+  const ids = [...messageIds];
+
+
+
+  if (ids.length === 0) {
+
+    return [];
+
+  }
+
+
+
+  const result = await client.getObjects({
+
+    objectIds: ids,
+
+    include: {
+
+      json: true,
+
+    },
+
+  });
+
+
+
+  return (result.objects ?? [])
+
+    .filter((object) => !(object instanceof Error))
+
+    .map((object) => ({
+
+      objectId: object.objectId,
+
+      ...object.json,
+
+    }))
+
+    .filter(
+
+      (message) =>
+
+        message.seller?.toLowerCase() === seller
+
+    )
+
+    .sort(
+
+      (a, b) =>
+
+        Number(a.created_at ?? 0) -
+
+        Number(b.created_at ?? 0)
+
+    );
+
+}
+// V2 buyer-funded offers are shared objects, discovered from creation events.
+const PURCHASE_OFFER_EVENT = `${MARKETPLACE_LATEST_PACKAGE_ID}::${MODULE}::PurchaseOfferCreated`;
+
+export async function getPurchaseOffers() {
+  if (!MARKETPLACE_LATEST_PACKAGE_ID) {
+    throw new Error("Latest marketplace package ID is not configured.");
+  }
+  const ids = new Set();
+  let cursor;
+  do {
+    const page = await client.listEvents({
+      filter: { eventType: PURCHASE_OFFER_EVENT },
+      order: "descending",
+      limit: 50,
+      ...(cursor ? { before: cursor } : {}),
+    });
+    for (const event of page.events ?? []) {
+      if (event.json?.offer_id) ids.add(event.json.offer_id);
+    }
+    if (!page.hasNextPage || !page.endCursor) break;
+    cursor = page.endCursor;
+  } while (true);
+
+  const all = [...ids];
+  const offers = [];
+  for (let i = 0; i < all.length; i += 50) {
+    const result = await client.getObjects({
+      objectIds: all.slice(i, i + 50),
+      include: { json: true },
+    });
+    offers.push(...(result.objects ?? [])
+      .filter((object) => object && !(object instanceof Error) && object.json)
+      .map((object) => ({ objectId: object.objectId, ...object.json })));
+  }
+  return offers;
+}
+
+export async function getBuyerPurchaseOffers(address) {
+  if (!address) return [];
+  return (await getPurchaseOffers()).filter(
+    (offer) => offer.buyer?.toLowerCase() === address.toLowerCase()
+  );
+}
+
+export async function getSellerPurchaseOffers(address) {
+  if (!address) return [];
+  return (await getPurchaseOffers()).filter(
+    (offer) => offer.seller?.toLowerCase() === address.toLowerCase()
+  );
+}
