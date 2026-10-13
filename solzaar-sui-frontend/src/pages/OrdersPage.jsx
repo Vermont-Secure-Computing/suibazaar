@@ -149,8 +149,7 @@ export default function OrdersPage() {
       !offer.active ||
       offer.accepted ||
       offer.rejected ||
-      offer.withdrawn ||
-      Number(offer.expires_at) <= Date.now()
+      offer.withdrawn
     ) {
       setError("This offer is no longer available for acceptance.");
       return;
@@ -212,8 +211,7 @@ export default function OrdersPage() {
       offer.active &&
       !offer.accepted &&
       !offer.rejected &&
-      !offer.withdrawn &&
-      Number(offer.expires_at) > Date.now();
+      !offer.withdrawn
 
     let transaction;
     let confirmation;
@@ -635,7 +633,6 @@ function purchaseOfferStatus(offer) {
   if (offer.rejected) return "Rejected";
   if (offer.withdrawn) return "Withdrawn";
   if (!offer.active) return "Inactive";
-  if (Number(offer.expires_at ?? 0) <= Date.now()) return "Expired";
   return "Pending";
 }
 
@@ -661,8 +658,7 @@ function PurchaseOfferList({
           offer.active &&
           !offer.accepted &&
           !offer.rejected &&
-          !offer.withdrawn &&
-          Number(offer.expires_at) > Date.now();
+          !offer.withdrawn;
 
         const busy = Boolean(processingOfferId);
         const processing = processingOfferId === offer.objectId;
@@ -692,9 +688,6 @@ function PurchaseOfferList({
             <div className="order-value">
               <small>Offer total</small>
               <strong>{mistToSui(offer.total_price)} SUI</strong>
-              <small>
-                Expires: {new Date(Number(offer.expires_at)).toLocaleString()}
-              </small>
             </div>
 
             <div className="order-status">

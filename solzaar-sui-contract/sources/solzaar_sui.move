@@ -50,13 +50,10 @@ module solzaar_sui::marketplace {
     const E_EMPTY_MESSAGE: u64 = 28;
     const E_MESSAGE_TOO_LONG: u64 = 29;
     const E_INVALID_SPECIAL_PRICE: u64 = 30;
-    const E_SPECIAL_OFFER_EXPIRED: u64 = 31;
     const E_SPECIAL_OFFER_INACTIVE: u64 = 32;
     const E_SPECIAL_OFFER_BUYER_MISMATCH: u64 = 33;
     const E_SPECIAL_OFFER_PRODUCT_MISMATCH: u64 = 34;
-    const E_PURCHASE_OFFER_EXPIRED: u64 = 35;
     const E_PURCHASE_OFFER_INACTIVE: u64 = 36;
-    const E_PURCHASE_OFFER_BUYER_MISMATCH: u64 = 37;
     const E_PURCHASE_OFFER_PRODUCT_MISMATCH: u64 = 38;
     const E_PURCHASE_OFFER_ESCROW_MISMATCH: u64 = 39;
     const E_ESCROW_ALREADY_BOUND: u64 = 40;
@@ -283,8 +280,6 @@ module solzaar_sui::marketplace {
         unit_price: u64,
         quantity: u32,
 
-        expires_at: u64,
-
         active: bool,
         used: bool,
 
@@ -300,8 +295,6 @@ module solzaar_sui::marketplace {
 
         unit_price: u64,
         quantity: u32,
-
-        expires_at: u64,
     }
 
     public struct SpecialPriceOfferCancelled has copy, drop {
@@ -330,8 +323,6 @@ module solzaar_sui::marketplace {
         security_deposit: u64,
         buyer_deposit: u64,
 
-        expires_at: u64,
-
         active: bool,
         accepted: bool,
         rejected: bool,
@@ -353,7 +344,6 @@ module solzaar_sui::marketplace {
         total_price: u64,
         buyer_deposit: u64,
 
-        expires_at: u64,
     }
 
     public struct PurchaseOfferAccepted has copy, drop {
@@ -1152,11 +1142,8 @@ module solzaar_sui::marketplace {
             E_SPECIAL_OFFER_INACTIVE
         );
 
-        // Offer must still be valid.
-        assert!(
-            offer.expires_at > now,
-            E_SPECIAL_OFFER_EXPIRED
-        );
+        // No expiration check: cancellation and one-time-use protections apply.
+        // No automatic expiration; status and authorization checks remain.
 
         assert!(
             offer.unit_price > 0,
@@ -2107,7 +2094,6 @@ module solzaar_sui::marketplace {
         escrow_object: &Escrow,
         unit_price: u64,
         quantity: u32,
-        expires_at: u64,
         clock: &Clock,
         ctx: &mut TxContext,
     ) {
@@ -2164,10 +2150,7 @@ module solzaar_sui::marketplace {
             E_INSUFFICIENT_STOCK
         );
 
-        assert!(
-            expires_at > now,
-            E_PURCHASE_OFFER_EXPIRED
-        );
+        // No automatic expiration; status and authorization checks remain.
 
         // --------------------------------------------------------
         // Calculate negotiated amount
@@ -2293,8 +2276,6 @@ module solzaar_sui::marketplace {
             security_deposit,
             buyer_deposit,
 
-            expires_at,
-
             active: true,
             accepted: false,
             rejected: false,
@@ -2322,8 +2303,6 @@ module solzaar_sui::marketplace {
             quantity,
             total_price,
             buyer_deposit,
-
-            expires_at,
         });
 
 
@@ -2382,10 +2361,7 @@ module solzaar_sui::marketplace {
             E_PURCHASE_OFFER_INACTIVE
         );
 
-        assert!(
-            now < offer.expires_at,
-            E_PURCHASE_OFFER_EXPIRED
-        );
+        // No automatic expiration; status and authorization checks remain.
 
         // --------------------------------------------------------
         // Escrow validation
@@ -2680,7 +2656,6 @@ module solzaar_sui::marketplace {
         buyer: address,
         unit_price: u64,
         quantity: u32,
-        expires_at: u64,
         clock: &Clock,
         ctx: &mut TxContext,
     ) {
@@ -2723,11 +2698,8 @@ module solzaar_sui::marketplace {
             E_INSUFFICIENT_STOCK
         );
 
-        // Offer must expire in the future.
-        assert!(
-            expires_at > now,
-            E_SPECIAL_OFFER_EXPIRED
-        );
+        // Offers do not expire automatically.
+        // No automatic expiration; status and authorization checks remain.
 
         let offer = SpecialPriceOffer {
             id: object::new(ctx),
@@ -2738,8 +2710,6 @@ module solzaar_sui::marketplace {
 
             unit_price,
             quantity,
-
-            expires_at,
 
             active: true,
             used: false,
@@ -2759,8 +2729,6 @@ module solzaar_sui::marketplace {
 
             unit_price,
             quantity,
-
-            expires_at,
         });
 
         transfer::share_object(offer);
@@ -2828,12 +2796,6 @@ module solzaar_sui::marketplace {
         offer: &SpecialPriceOffer,
     ): u32 {
         offer.quantity
-    }
-
-    public fun special_offer_expires_at(
-        offer: &SpecialPriceOffer,
-    ): u64 {
-        offer.expires_at
     }
 
     public fun special_offer_active(

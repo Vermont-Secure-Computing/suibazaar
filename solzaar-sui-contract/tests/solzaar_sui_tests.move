@@ -2110,7 +2110,6 @@ module solzaar_sui::solzaar_sui_tests {
                 BUYER,
                 800_000_000u64,
                 2u32,
-                60_000u64,
                 &clock,
                 test_scenario::ctx(&mut scenario),
             );
@@ -2152,12 +2151,6 @@ module solzaar_sui::solzaar_sui_tests {
                 marketplace::special_offer_quantity(&offer)
                     == 2u32,
                 503
-            );
-
-            assert!(
-                marketplace::special_offer_expires_at(&offer)
-                    == 60_000u64,
-                504
             );
 
             assert!(
@@ -2222,7 +2215,6 @@ module solzaar_sui::solzaar_sui_tests {
                 BUYER,
                 800_000_000u64,
                 1u32,
-                60_000u64,
                 &clock,
                 test_scenario::ctx(&mut scenario),
             );
@@ -2278,7 +2270,6 @@ module solzaar_sui::solzaar_sui_tests {
                 BUYER,
                 0u64,
                 1u32,
-                60_000u64,
                 &clock,
                 test_scenario::ctx(&mut scenario),
             );
@@ -2334,7 +2325,6 @@ module solzaar_sui::solzaar_sui_tests {
                 BUYER,
                 800_000_000u64,
                 0u32,
-                60_000u64,
                 &clock,
                 test_scenario::ctx(&mut scenario),
             );
@@ -2381,7 +2371,6 @@ module solzaar_sui::solzaar_sui_tests {
                 BUYER,
                 800_000_000u64,
                 11u32,
-                60_000u64,
                 &clock,
                 test_scenario::ctx(&mut scenario),
             );
@@ -2428,7 +2417,6 @@ module solzaar_sui::solzaar_sui_tests {
                 MERCHANT,
                 800_000_000u64,
                 1u32,
-                60_000u64,
                 &clock,
                 test_scenario::ctx(&mut scenario),
             );
@@ -2442,11 +2430,7 @@ module solzaar_sui::solzaar_sui_tests {
 
 
     #[test]
-    #[expected_failure(
-        abort_code = 31,
-        location = solzaar_sui::marketplace
-    )]
-    fun test_special_price_offer_expired_rejected() {
+    fun test_special_price_offer_past_expiry_allowed() {
         let mut scenario = test_scenario::begin(MERCHANT);
 
         create_test_registry(&mut scenario);
@@ -2482,7 +2466,6 @@ module solzaar_sui::solzaar_sui_tests {
                 BUYER,
                 800_000_000u64,
                 1u32,
-                5_000u64,
                 &clock,
                 test_scenario::ctx(&mut scenario),
             );
@@ -2545,7 +2528,6 @@ module solzaar_sui::solzaar_sui_tests {
                 BUYER,
                 800_000_000u64,
                 2u32,
-                60_000u64,
                 &clock,
                 test_scenario::ctx(&mut scenario),
             );
@@ -2773,7 +2755,6 @@ module solzaar_sui::solzaar_sui_tests {
                 BUYER,
                 800_000_000u64,
                 2u32,
-                60_000u64,
                 &clock,
                 test_scenario::ctx(&mut scenario),
             );
@@ -2920,7 +2901,6 @@ module solzaar_sui::solzaar_sui_tests {
                 BUYER,
                 800_000_000u64,
                 2u32,
-                60_000u64,
                 &clock,
                 test_scenario::ctx(&mut scenario),
             );
@@ -3090,7 +3070,6 @@ module solzaar_sui::solzaar_sui_tests {
                 BUYER,
                 800_000_000u64,
                 2u32,
-                60_000u64,
                 &clock,
                 test_scenario::ctx(&mut scenario),
             );
@@ -3347,7 +3326,6 @@ module solzaar_sui::solzaar_sui_tests {
                 BUYER,
                 800_000_000u64,
                 2u32,
-                60_000u64,
                 &clock,
                 test_scenario::ctx(&mut scenario),
             );
@@ -3532,11 +3510,7 @@ module solzaar_sui::solzaar_sui_tests {
     }
 
         #[test]
-    #[expected_failure(
-        abort_code = 31,
-        location = solzaar_sui::marketplace
-    )]
-    fun test_special_price_checkout_expired_offer_rejected() {
+    fun test_special_price_checkout_past_expiry_allowed() {
         let mut scenario =
             test_scenario::begin(MERCHANT);
 
@@ -3581,7 +3555,6 @@ module solzaar_sui::solzaar_sui_tests {
                 BUYER,
                 800_000_000u64,
                 2u32,
-                60_000u64,
                 &clock,
                 test_scenario::ctx(&mut scenario),
             );
@@ -3652,7 +3625,7 @@ module solzaar_sui::solzaar_sui_tests {
         );
 
         // ========================================================
-        // Checkout must now reject the previously valid offer.
+        // Checkout should succeed even after the old expiry timestamp.
         // ========================================================
 
         scenario.next_tx(BUYER);
@@ -3838,7 +3811,6 @@ module solzaar_sui::solzaar_sui_tests {
 
                 4_000_000_000u64,
                 1u32,
-                60_000u64,
 
                 &clock,
                 test_scenario::ctx(&mut scenario),
@@ -4099,7 +4071,6 @@ module solzaar_sui::solzaar_sui_tests {
                 &escrow_obj,
                 4_000_000_000u64,
                 1u32,
-                60_000u64,
                 clock,
                 test_scenario::ctx(scenario),
             );
@@ -4178,11 +4149,7 @@ module solzaar_sui::solzaar_sui_tests {
     // ========================================================
 
     #[test]
-    #[expected_failure(
-        abort_code = 35,
-        location = solzaar_sui::marketplace
-    )]
-    fun test_purchase_offer_expired_accept_rejected() {
+    fun test_purchase_offer_past_expiry_accept_allowed() {
         let mut scenario = test_scenario::begin(MERCHANT);
 
         let mut clock = clock::create_for_testing(
@@ -4407,7 +4374,7 @@ module solzaar_sui::solzaar_sui_tests {
             let escrow_obj = test_scenario::take_shared<escrow::Escrow>(&scenario);
             marketplace::create_purchase_offer(
                 &merchant, &product, &escrow_obj,
-                1_000_000_000u64, 1u32, 60_000u64,
+                1_000_000_000u64, 1u32,
                 &clock, test_scenario::ctx(&mut scenario),
             );
             test_scenario::return_shared(merchant);

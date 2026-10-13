@@ -132,7 +132,6 @@ export function createBuyerPurchaseOfferTx({
   productId,
   unitPriceMist,
   quantity,
-  expiresAt,
   buyerDeposit,
 }) {
   const tx = new Transaction();
@@ -160,7 +159,6 @@ export function createBuyerPurchaseOfferTx({
       tx.object(escrowId),
       tx.pure.u64(BigInt(unitPriceMist)),
       tx.pure.u32(Number(quantity)),
-      tx.pure.u64(BigInt(expiresAt)),
       tx.object(CLOCK_ID),
     ],
   });
