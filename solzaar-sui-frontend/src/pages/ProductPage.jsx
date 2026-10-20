@@ -75,6 +75,8 @@ export default function ProductPage() {
   const [offerMessage, setOfferMessage] = useState("");
   const [pendingOfferEscrow, setPendingOfferEscrow] = useState(null);
 
+  const effectiveSellerBps = product?.seller_deposit_bps_override?.vec?.[0] ?? product?.seller_deposit_bps_override?.[0] ?? product?.seller_deposit_bps_override?.Some ?? (typeof product?.seller_deposit_bps_override === "number" ? product.seller_deposit_bps_override : null) ?? merchant?.seller_deposit_bps ?? 0;
+
   const [messageSellerOpen, setMessageSellerOpen] = useState(false);
 
   const [sellerMessage, setSellerMessage] = useState("");
@@ -376,7 +378,7 @@ export default function ProductPage() {
       const amounts = calculateOrderAmounts({
         price: unitPriceMist,
         quantity: safeQuantity,
-        sellerDepositBps: merchant.seller_deposit_bps,
+        sellerDepositBps: effectiveSellerBps,
       });
       const offerKey = [
         account.address,
@@ -517,7 +519,7 @@ export default function ProductPage() {
 
         quantity: safeQuantity,
 
-        sellerDepositBps: merchant.seller_deposit_bps,
+        sellerDepositBps: effectiveSellerBps,
       });
 
       /*

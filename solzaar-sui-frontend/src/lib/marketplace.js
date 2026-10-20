@@ -44,6 +44,7 @@ export function createMerchantTx(f) {
   return tx;
 }
 
+
 export function createProductTx(f) {
   need();
 
@@ -60,12 +61,19 @@ export function createProductTx(f) {
       tx.pure.string(f.category),
       tx.pure.u64(BigInt(f.priceMist)),
       tx.pure.u32(Number(f.stock)),
+      tx.pure.option(
+        "u16",
+        f.sellerDepositOverrideBps == null
+          ? null
+          : Number(f.sellerDepositOverrideBps)
+      ),
       tx.object(CLOCK_ID),
     ],
   });
 
   return tx;
 }
+
 
 export function submitReviewTx({
   merchantId,

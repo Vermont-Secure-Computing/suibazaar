@@ -4,6 +4,16 @@ import { useCurrentAccount, useDAppKit } from "@mysten/dapp-kit-react";
 import { createProductTx } from "../lib/marketplace";
 import { getMerchantByAuthority } from "../lib/marketplaceData";
 
+function parseDepositPercent(value) {
+  const text = String(value).trim();
+  if (!/^(?:\d{1,3})(?:\.\d{1,2})?$/.test(text))
+    throw new Error("Deposit override must have at most two decimal places.");
+  const [whole, frac = ""] = text.split(".");
+  const bps = Number(whole) * 100 + Number(frac.padEnd(2, "0"));
+  if (bps > 10000) throw new Error("Deposit override must be 0–100%.");
+  return bps;
+}
+
 const MAX_IMAGES = 3;
 const MAX_IMAGE_URI_BYTES = 250;
 
@@ -43,6 +53,7 @@ export default function CreateProduct() {
   const [category, setCategory] = useState("");
   const [price, setPrice] = useState("");
   const [stock, setStock] = useState("");
+  const [sellerDepositOverride, setSellerDepositOverride] = useState("");
 
   const [submitting, setSubmitting] = useState(false);
   const [message, setMessage] = useState("");
@@ -99,8 +110,8 @@ export default function CreateProduct() {
   const updateImageUri = (index, value) => {
     setImageUris((current) =>
       current.map((imageUri, imageIndex) =>
-        imageIndex === index ? value : imageUri
-      )
+        imageIndex === index ? value : imageUri,
+      ),
     );
   };
 
@@ -155,7 +166,7 @@ export default function CreateProduct() {
       if (bytes > maxBytes) {
         setMessage(
           `${label} must not exceed ${maxBytes} UTF-8 bytes. ` +
-            `Current size: ${bytes} bytes.`
+            `Current size: ${bytes} bytes.`,
         );
         return;
       }
@@ -163,14 +174,14 @@ export default function CreateProduct() {
 
     const cleanedTotalBytes = limits.reduce(
       (total, [, value]) => total + utf8ByteLength(value),
-      0
+      0,
     );
 
     if (cleanedTotalBytes > transactionContentLimit) {
       setMessage(
         `Product information is too large. ` +
           `Current content: ${cleanedTotalBytes} bytes. ` +
-          `Recommended maximum: ${transactionContentLimit} bytes.`
+          `Recommended maximum: ${transactionContentLimit} bytes.`,
       );
       return;
     }
@@ -229,6 +240,10 @@ export default function CreateProduct() {
     }
 
     try {
+      const sellerDepositOverrideBps =
+        sellerDepositOverride.trim() === ""
+          ? null
+          : parseDepositPercent(sellerDepositOverride);
       setSubmitting(true);
       setMessage("Waiting for wallet confirmation...");
 
@@ -241,6 +256,7 @@ export default function CreateProduct() {
         category: cleanedCategory,
         priceMist,
         stock: stockNumber,
+        sellerDepositOverrideBps,
       });
 
       const result = await dAppKit.signAndExecuteTransaction({
@@ -250,14 +266,14 @@ export default function CreateProduct() {
       if (result.FailedTransaction) {
         throw new Error(
           result.FailedTransaction.status?.error?.message ||
-            "Transaction failed"
+            "Transaction failed",
         );
       }
 
       const digest = result.Transaction?.digest;
 
       setMessage(
-        digest ? `Product created: ${digest}` : "Product created successfully."
+        digest ? `Product created: ${digest}` : "Product created successfully.",
       );
 
       setTitle("");
@@ -332,9 +348,7 @@ export default function CreateProduct() {
         </div>
       )}
 
-      <label>
-        Product Name
-      </label>
+      <label>Product Name</label>
       <br />
 
       <input
@@ -349,9 +363,7 @@ export default function CreateProduct() {
 
       <br />
 
-      <label>
-        Product Description
-      </label>
+      <label>Product Description</label>
       <br />
 
       <textarea
@@ -393,9 +405,7 @@ export default function CreateProduct() {
 
       <br />
 
-      <label>
-        Category
-      </label>
+      <label>Category</label>
       <br />
 
       <input
@@ -410,9 +420,7 @@ export default function CreateProduct() {
 
       <br />
 
-      <label>
-        Price in SUI
-      </label>
+      <label>Price in SUI</label>
       <br />
 
       <input
@@ -425,15 +433,11 @@ export default function CreateProduct() {
         onChange={(event) => setPrice(event.target.value)}
       />
 
-      <div>
-        Minimum price: 0.000000001 SUI
-      </div>
+      <div>Minimum price: 0.000000001 SUI</div>
 
       <br />
 
-      <label>
-        Available Stock
-      </label>
+      <label>Available Stock</label>
       <br />
 
       <input

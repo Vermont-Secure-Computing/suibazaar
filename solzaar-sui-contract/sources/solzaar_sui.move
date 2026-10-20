@@ -4,6 +4,8 @@ module solzaar_sui::marketplace {
     use std::vector;
 
     use sui::clock::{Self, Clock};
+    use sui::coin::Coin;
+    use sui::sui::SUI;
     use sui::event;
     use sui::object::{Self, ID, UID};
     use sui::transfer;
@@ -58,6 +60,8 @@ module solzaar_sui::marketplace {
     const E_PURCHASE_OFFER_ESCROW_MISMATCH: u64 = 39;
     const E_ESCROW_ALREADY_BOUND: u64 = 40;
     const E_LEGACY_CHECKOUT_DISABLED: u64 = 41;
+    const E_CANCELLATION_REASON_EMPTY: u64 = 42;
+    const E_CANCELLATION_REASON_TOO_LONG: u64 = 43;
 
     // ============================================================
     // Limits
@@ -130,6 +134,7 @@ module solzaar_sui::marketplace {
         category: String,
 
         price: u64,
+        seller_deposit_bps_override: option::Option<u16>,
         stock: u32,
         sold: u32,
 
@@ -625,6 +630,7 @@ module solzaar_sui::marketplace {
         category: String,
         price: u64,
         stock: u32,
+        seller_deposit_bps_override: option::Option<u16>,
 
         clock: &Clock,
         ctx: &mut TxContext,
@@ -649,6 +655,8 @@ module solzaar_sui::marketplace {
             price,
         );
 
+        validate_deposit_override(&seller_deposit_bps_override);
+
         let now =
             clock::timestamp_ms(clock);
 
@@ -664,6 +672,7 @@ module solzaar_sui::marketplace {
             category,
 
             price,
+            seller_deposit_bps_override,
             stock,
             sold: 0,
 
@@ -700,6 +709,7 @@ module solzaar_sui::marketplace {
         price: u64,
         stock: u32,
         active: bool,
+        seller_deposit_bps_override: option::Option<u16>,
 
         clock: &Clock,
         ctx: &TxContext,
@@ -724,12 +734,15 @@ module solzaar_sui::marketplace {
             price,
         );
 
+        validate_deposit_override(&seller_deposit_bps_override);
+
         product.title = title;
         product.description_uri =
             description_uri;
         product.image_uris = image_uris;
         product.category = category;
         product.price = price;
+        product.seller_deposit_bps_override = seller_deposit_bps_override;
         product.stock = stock;
         product.active = active;
 
@@ -917,7 +930,7 @@ module solzaar_sui::marketplace {
         let deposit_numerator =
             checked_mul(
                 total_price,
-                merchant.seller_deposit_bps as u64
+                effective_deposit_bps(product, merchant)
             );
 
         let mut security_deposit =
@@ -1177,7 +1190,7 @@ module solzaar_sui::marketplace {
         let deposit_numerator =
             checked_mul(
                 total_price,
-                merchant.seller_deposit_bps as u64
+                effective_deposit_bps(product, merchant)
             );
 
         let mut security_deposit =
@@ -1586,6 +1599,76 @@ module solzaar_sui::marketplace {
     }
 
     // ============================================================
+    // Marketplace Mutual Cancellation (generic escrow adapter)
+    // ============================================================
+
+    fun assert_order_escrow_match(order: &OrderRecord, escrow_object: &Escrow) {
+        assert!(order.escrow == object::id(escrow_object), E_INVALID_ORDER_STATUS);
+        assert!(escrow::party_a_address(escrow_object) == order.buyer, E_INVALID_ESCROW_PARTIES);
+        assert!(escrow::party_b_address(escrow_object) == order.seller, E_INVALID_ESCROW_PARTIES);
+        assert!(!order.stock_restored, E_INVALID_ORDER_STATUS);
+        assert!(!order.completed_sale_recorded, E_INVALID_ORDER_STATUS);
+    }
+
+    // Either party proposes a neutral refund. Generic escrow owns the funds.
+    public fun request_mutual_cancellation(
+        order: &OrderRecord,
+        escrow_object: &mut Escrow,
+        reason: vector<u8>,
+        ctx: &TxContext,
+    ) {
+        assert_order_escrow_match(order, escrow_object);
+        assert!(escrow::status(escrow_object) == 1, E_INVALID_ORDER_STATUS);
+        assert!(vector::length(&reason) > 0, E_CANCELLATION_REASON_EMPTY);
+        // Prefix plus reason must fit generic escrow's 200-byte note.
+        assert!(vector::length(&reason) <= 180, E_CANCELLATION_REASON_TOO_LONG);
+        let mut note = b"MUTUAL_CANCELLATION|";
+        vector::append(&mut note, reason);
+        let refund_a = escrow::deposited_a(escrow_object);
+        let refund_b = escrow::deposited_b(escrow_object);
+        escrow::suggest_finalization(
+            escrow_object,
+            refund_a,
+            refund_b,
+            0,
+            note,
+            ctx,
+        );
+    }
+
+    // Approve and restore stock atomically in a single Sui transaction.
+    public fun approve_mutual_cancellation(
+        product: &mut Product,
+        order: &mut OrderRecord,
+        escrow_object: &mut Escrow,
+        clock: &Clock,
+        ctx: &mut TxContext,
+    ) {
+        assert_order_escrow_match(order, escrow_object);
+        assert!(order.product == object::id(product), E_INVALID_ORDER_STATUS);
+        assert!(escrow::status(escrow_object) == 2, E_INVALID_ORDER_STATUS);
+        assert!(escrow::proposed_payout_a(escrow_object) == escrow::deposited_a(escrow_object), E_INVALID_ORDER_STATUS);
+        assert!(escrow::proposed_payout_b(escrow_object) == escrow::deposited_b(escrow_object), E_INVALID_ORDER_STATUS);
+        assert!(escrow::proposed_donation(escrow_object) == 0, E_INVALID_ORDER_STATUS);
+        escrow::accept_finalization(escrow_object, clock, ctx);
+        restore_mutually_cancelled_order_stock(product, order, escrow_object);
+    }
+
+    // The generic escrow rejects the proposal and returns to deposits-complete.
+    public fun decline_mutual_cancellation(
+        order: &OrderRecord,
+        escrow_object: &mut Escrow,
+        ctx: &TxContext,
+    ) {
+        assert_order_escrow_match(order, escrow_object);
+        assert!(escrow::status(escrow_object) == 2, E_INVALID_ORDER_STATUS);
+        assert!(escrow::proposed_payout_a(escrow_object) == escrow::deposited_a(escrow_object), E_INVALID_ORDER_STATUS);
+        assert!(escrow::proposed_payout_b(escrow_object) == escrow::deposited_b(escrow_object), E_INVALID_ORDER_STATUS);
+        assert!(escrow::proposed_donation(escrow_object) == 0, E_INVALID_ORDER_STATUS);
+        escrow::reject_finalization(escrow_object, ctx);
+    }
+
+    // ============================================================
     // Solzaar Escrow Marker
     // ============================================================
 
@@ -1806,6 +1889,20 @@ module solzaar_sui::marketplace {
         a + b
     }
 
+    fun validate_deposit_override(value: &option::Option<u16>) {
+        if (option::is_some(value)) {
+            assert!((*option::borrow(value) as u64) <= MAX_BPS, E_INVALID_DEPOSIT_PERCENT);
+        };
+    }
+
+    fun effective_deposit_bps(product: &Product, merchant: &MerchantProfile): u64 {
+        if (option::is_some(&product.seller_deposit_bps_override)) {
+            *option::borrow(&product.seller_deposit_bps_override) as u64
+        } else {
+            merchant.seller_deposit_bps as u64
+        }
+    }
+
     // ============================================================
     // Read Helpers
     // ============================================================
@@ -2002,6 +2099,46 @@ module solzaar_sui::marketplace {
         message.created_at
     }
 
+    // Solana-compatible escrow-scoped messaging.
+    public fun send_message(
+        product: &Product,
+        escrow_object: &Escrow,
+        message: String,
+        clock: &Clock,
+        ctx: &mut TxContext,
+    ) {
+        let sender = tx_context::sender(ctx);
+        let buyer = escrow::party_a_address(escrow_object);
+        let seller = escrow::party_b_address(escrow_object);
+        assert!(contains_solzaar_marker(escrow::note(escrow_object)), E_NOT_SOLZAAR_ESCROW);
+        assert!(product.merchant == seller && buyer != seller, E_INVALID_ESCROW_PARTIES);
+        assert!(sender == buyer || sender == seller, E_UNAUTHORIZED);
+        assert!(message.length() > 0, E_EMPTY_MESSAGE);
+        assert!(message.length() <= MAX_MESSAGE_LENGTH, E_MESSAGE_TOO_LONG);
+        let recipient = if (sender == buyer) { seller } else { buyer };
+        let chat_message = ChatMessage {
+            id: object::new(ctx),
+            product: object::id(product),
+            buyer,
+            seller,
+            sender,
+            recipient,
+            message,
+            created_at: clock::timestamp_ms(clock),
+        };
+        let message_id = object::id(&chat_message);
+        event::emit(MessageSent {
+            message_id,
+            product: object::id(product),
+            buyer,
+            seller,
+            sender,
+            recipient,
+            created_at: clock::timestamp_ms(clock),
+        });
+        transfer::share_object(chat_message);
+    }
+
     public fun send_product_message(
         product: &Product,
         buyer: address,
@@ -2150,6 +2287,8 @@ module solzaar_sui::marketplace {
             E_INSUFFICIENT_STOCK
         );
 
+        assert!(unit_price < product.price, E_INVALID_ORDER_AMOUNT);
+
         // No automatic expiration; status and authorization checks remain.
 
         // --------------------------------------------------------
@@ -2167,7 +2306,7 @@ module solzaar_sui::marketplace {
         let deposit_numerator =
             checked_mul(
                 total_price,
-                merchant.seller_deposit_bps as u64
+                effective_deposit_bps(product, merchant)
             );
 
         let mut security_deposit =
@@ -2368,7 +2507,7 @@ module solzaar_sui::marketplace {
         // --------------------------------------------------------
 
         assert!(
-            escrow::status(escrow_object) == 0,
+            escrow::status(escrow_object) == 1,
             E_INVALID_ORDER_STATUS
         );
 
@@ -2450,7 +2589,7 @@ module solzaar_sui::marketplace {
         );
 
         assert!(
-            escrow::status(escrow_object) == 0,
+            escrow::status(escrow_object) == 1,
             E_INVALID_ORDER_STATUS
         );
 
@@ -2508,7 +2647,7 @@ module solzaar_sui::marketplace {
         );
 
         assert!(
-            escrow::deposited_b(escrow_object) == 0,
+            escrow::deposited_b(escrow_object) == offer.security_deposit,
             E_INVALID_SELLER_DEPOSIT
         );
 
@@ -2621,6 +2760,7 @@ module solzaar_sui::marketplace {
 
     public fun withdraw_purchase_offer(
         offer: &mut PurchaseOffer,
+        escrow_object: &mut Escrow,
         ctx: &mut TxContext,
     ) {
         let buyer = tx_context::sender(ctx);
@@ -2631,12 +2771,21 @@ module solzaar_sui::marketplace {
         );
 
         assert!(
-            offer.active &&
             !offer.accepted &&
-            !offer.rejected &&
-            !offer.withdrawn,
+            !offer.withdrawn &&
+            (offer.active || offer.rejected),
             E_PURCHASE_OFFER_INACTIVE
         );
+
+        assert!(object::id(escrow_object) == offer.escrow, E_PURCHASE_OFFER_ESCROW_MISMATCH);
+        assert!(escrow::status(escrow_object) == 0, E_INVALID_ORDER_STATUS);
+        assert!(escrow::creator(escrow_object) == buyer, E_INVALID_ESCROW_PARTIES);
+        assert!(escrow::party_a_address(escrow_object) == buyer, E_INVALID_ESCROW_PARTIES);
+        assert!(escrow::party_b_address(escrow_object) == offer.seller, E_INVALID_ESCROW_PARTIES);
+        assert!(escrow::deposited_a(escrow_object) == offer.buyer_deposit, E_BUYER_DEPOSIT_INCOMPLETE);
+        assert!(escrow::deposited_b(escrow_object) == 0, E_INVALID_SELLER_DEPOSIT);
+        escrow::withdraw_before_complete(escrow_object, ctx);
+        assert!(escrow::status(escrow_object) == 4, E_INVALID_ORDER_STATUS);
 
         offer.active = false;
         offer.withdrawn = true;

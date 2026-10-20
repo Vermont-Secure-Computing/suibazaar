@@ -159,6 +159,7 @@ module solzaar_sui::solzaar_sui_tests {
                 string::utf8(b"General"),
                 1_000_000_000u64,
                 10u32,
+                option::none<u16>(),
                 clock,
                 test_scenario::ctx(scenario),
             );
@@ -186,6 +187,7 @@ module solzaar_sui::solzaar_sui_tests {
             string::utf8(b"General"),
             1_000_000_000u64,
             10u32,
+                option::none<u16>(),
             clock,
             test_scenario::ctx(scenario),
         );
@@ -317,6 +319,7 @@ module solzaar_sui::solzaar_sui_tests {
                 string::utf8(b"General"),
                 1_000_000_000,
                 10,
+                option::none<u16>(),
                 &clock,
                 ctx,
             );
@@ -446,6 +449,7 @@ module solzaar_sui::solzaar_sui_tests {
                 string::utf8(b"General"),
                 1_000_000_000,
                 10,
+                option::none<u16>(),
                 &clock,
                 test_scenario::ctx(&mut scenario),
             );
@@ -1587,6 +1591,7 @@ module solzaar_sui::solzaar_sui_tests {
                 string::utf8(b"General"),
                 17_000_000_000_000_000_000u64,
                 1u32,
+                option::none<u16>(),
                 &clock,
                 test_scenario::ctx(&mut scenario),
             );
@@ -3728,11 +3733,11 @@ module solzaar_sui::solzaar_sui_tests {
         // ========================================================
         // Buyer creates escrow
         //
-        // Offer price:     4.0 SUI
+        // Offer price:     0.8 SUI
         // Quantity:        1
-        // Total:           4.0 SUI
-        // Security 10%:    0.4 SUI
-        // Buyer deposit:   4.4 SUI
+        // Total:           0.8 SUI
+        // Security 10%:    0.08 SUI
+        // Buyer deposit:   0.88 SUI
         // ========================================================
 
         scenario.next_tx(BUYER);
@@ -3742,9 +3747,9 @@ module solzaar_sui::solzaar_sui_tests {
             option::some(BUYER),
             option::some(MERCHANT),
 
-            4_000_000_000u64,
-            4_400_000_000u64,
-            400_000_000u64,
+            800_000_000u64,
+            880_000_000u64,
+            80_000_000u64,
 
             b"{\"marketplace\":\"solbazaar\",\"purchase_offer\":true}",
 
@@ -3753,7 +3758,7 @@ module solzaar_sui::solzaar_sui_tests {
         );
 
         // ========================================================
-        // Buyer funds escrow with exact 4.4 SUI
+        // Buyer funds escrow with exact 0.88 SUI
         // ========================================================
 
         scenario.next_tx(BUYER);
@@ -3766,7 +3771,7 @@ module solzaar_sui::solzaar_sui_tests {
 
             let buyer_coin =
                 coin::mint_for_testing<SUI>(
-                    4_400_000_000u64,
+                    880_000_000u64,
                     test_scenario::ctx(&mut scenario),
                 );
 
@@ -3809,7 +3814,7 @@ module solzaar_sui::solzaar_sui_tests {
                 &product,
                 &escrow_obj,
 
-                4_000_000_000u64,
+                800_000_000u64,
                 1u32,
 
                 &clock,
@@ -3844,21 +3849,21 @@ module solzaar_sui::solzaar_sui_tests {
             assert!(
                 marketplace::purchase_offer_unit_price(
                     &offer
-                ) == 4_000_000_000u64,
+                ) == 800_000_000u64,
                 800
             );
 
             assert!(
                 marketplace::purchase_offer_total_price(
                     &offer
-                ) == 4_000_000_000u64,
+                ) == 800_000_000u64,
                 801
             );
 
             assert!(
                 marketplace::purchase_offer_buyer_deposit(
                     &offer
-                ) == 4_400_000_000u64,
+                ) == 880_000_000u64,
                 802
             );
 
@@ -3901,10 +3906,22 @@ module solzaar_sui::solzaar_sui_tests {
                     marketplace::PurchaseOffer
                 >(&scenario);
 
-            let escrow_obj =
+            let mut escrow_obj =
                 test_scenario::take_shared<
                     escrow::Escrow
                 >(&scenario);
+
+            let seller_coin = coin::mint_for_testing<SUI>(
+                80_000_000u64,
+                test_scenario::ctx(&mut scenario),
+            );
+            escrow::deposit(
+                &mut escrow_obj,
+                seller_coin,
+                &clock,
+                test_scenario::ctx(&mut scenario),
+            );
+            assert!(escrow::status(&escrow_obj) == 1u8, 990);
 
             marketplace::accept_purchase_offer(
                 &mut registry,
@@ -3963,13 +3980,13 @@ module solzaar_sui::solzaar_sui_tests {
 
             assert!(
                 marketplace::order_total_price(&order)
-                    == 4_000_000_000u64,
+                    == 800_000_000u64,
                 815
             );
 
             assert!(
                 marketplace::order_security_deposit(&order)
-                    == 400_000_000u64,
+                    == 80_000_000u64,
                 816
             );
 
@@ -4013,9 +4030,9 @@ module solzaar_sui::solzaar_sui_tests {
             0u8,
             option::some(BUYER),
             option::some(MERCHANT),
-            4_000_000_000u64,
-            4_400_000_000u64,
-            400_000_000u64,
+            800_000_000u64,
+            880_000_000u64,
+            80_000_000u64,
             b"{\"marketplace\":\"solbazaar\",\"purchase_offer\":true}",
             clock,
             test_scenario::ctx(scenario),
@@ -4032,7 +4049,7 @@ module solzaar_sui::solzaar_sui_tests {
 
             let buyer_coin =
                 coin::mint_for_testing<SUI>(
-                    4_400_000_000u64,
+                    880_000_000u64,
                     test_scenario::ctx(scenario),
                 );
 
@@ -4069,7 +4086,7 @@ module solzaar_sui::solzaar_sui_tests {
                 &merchant,
                 &product,
                 &escrow_obj,
-                4_000_000_000u64,
+                800_000_000u64,
                 1u32,
                 clock,
                 test_scenario::ctx(scenario),
@@ -4182,9 +4199,21 @@ module solzaar_sui::solzaar_sui_tests {
                 marketplace::PurchaseOffer
             >(&scenario);
 
-            let escrow_obj = test_scenario::take_shared<
+            let mut escrow_obj = test_scenario::take_shared<
                 escrow::Escrow
             >(&scenario);
+
+            let seller_coin = coin::mint_for_testing<SUI>(
+                80_000_000u64,
+                test_scenario::ctx(&mut scenario),
+            );
+            escrow::deposit(
+                &mut escrow_obj,
+                seller_coin,
+                &clock,
+                test_scenario::ctx(&mut scenario),
+            );
+            assert!(escrow::status(&escrow_obj) == 1u8, 990);
 
             marketplace::accept_purchase_offer(
                 &mut registry,
@@ -4245,9 +4274,21 @@ module solzaar_sui::solzaar_sui_tests {
                 marketplace::PurchaseOffer
             >(&scenario);
 
-            let escrow_obj = test_scenario::take_shared<
+            let mut escrow_obj = test_scenario::take_shared<
                 escrow::Escrow
             >(&scenario);
+
+            let seller_coin = coin::mint_for_testing<SUI>(
+                80_000_000u64,
+                test_scenario::ctx(&mut scenario),
+            );
+            escrow::deposit(
+                &mut escrow_obj,
+                seller_coin,
+                &clock,
+                test_scenario::ctx(&mut scenario),
+            );
+            assert!(escrow::status(&escrow_obj) == 1u8, 990);
 
             marketplace::accept_purchase_offer(
                 &mut registry,
@@ -4363,24 +4404,14 @@ module solzaar_sui::solzaar_sui_tests {
         create_test_merchant(&mut scenario, &clock);
         scenario.next_tx(MERCHANT);
         create_test_product(&mut scenario, &clock);
+
+        // Original product price is 1 SUI. The escrow matches a normal order.
         scenario.next_tx(BUYER);
         create_test_escrow(&mut scenario, &clock);
         scenario.next_tx(BUYER);
         deposit_test_buyer(&mut scenario, &clock);
-        scenario.next_tx(BUYER);
-        {
-            let merchant = test_scenario::take_shared<marketplace::MerchantProfile>(&scenario);
-            let product = test_scenario::take_shared<marketplace::Product>(&scenario);
-            let escrow_obj = test_scenario::take_shared<escrow::Escrow>(&scenario);
-            marketplace::create_purchase_offer(
-                &merchant, &product, &escrow_obj,
-                1_000_000_000u64, 1u32,
-                &clock, test_scenario::ctx(&mut scenario),
-            );
-            test_scenario::return_shared(merchant);
-            test_scenario::return_shared(product);
-            test_scenario::return_shared(escrow_obj);
-        };
+
+        // Bind the escrow to a regular order first.
         scenario.next_tx(BUYER);
         {
             let mut registry = test_scenario::take_shared<marketplace::MerchantRegistry>(&scenario);
@@ -4396,6 +4427,59 @@ module solzaar_sui::solzaar_sui_tests {
             test_scenario::return_shared(product);
             test_scenario::return_shared(escrow_obj);
         };
+
+        // Change the listing to 2 SUI. The original 1 SUI escrow now
+        // also satisfies the discounted-offer amount checks.
+        scenario.next_tx(MERCHANT);
+        {
+            let mut product = test_scenario::take_shared<marketplace::Product>(&scenario);
+            marketplace::update_product(
+                &mut product,
+                string::utf8(b"Test Product"),
+                string::utf8(b"ipfs://product-description"),
+                make_images(),
+                string::utf8(b"General"),
+                2_000_000_000u64,
+                9u32,
+                true,
+                option::none<u16>(),
+                &clock,
+                test_scenario::ctx(&mut scenario),
+            );
+            test_scenario::return_shared(product);
+        };
+
+        // Buyer can construct a valid discounted offer for that escrow,
+        // even though it is already bound. Acceptance must reject reuse.
+        scenario.next_tx(BUYER);
+        {
+            let merchant = test_scenario::take_shared<marketplace::MerchantProfile>(&scenario);
+            let product = test_scenario::take_shared<marketplace::Product>(&scenario);
+            let escrow_obj = test_scenario::take_shared<escrow::Escrow>(&scenario);
+            marketplace::create_purchase_offer(
+                &merchant, &product, &escrow_obj,
+                1_000_000_000u64, 1u32,
+                &clock, test_scenario::ctx(&mut scenario),
+            );
+            test_scenario::return_shared(merchant);
+            test_scenario::return_shared(product);
+            test_scenario::return_shared(escrow_obj);
+        };
+
+        // Acceptance requires the escrow to be fully funded (status 1).
+        scenario.next_tx(MERCHANT);
+        {
+            let mut escrow_obj = test_scenario::take_shared<escrow::Escrow>(&scenario);
+            let seller_coin = coin::mint_for_testing<SUI>(
+                100_000_000u64, test_scenario::ctx(&mut scenario),
+            );
+            escrow::deposit(
+                &mut escrow_obj, seller_coin, &clock,
+                test_scenario::ctx(&mut scenario),
+            );
+            test_scenario::return_shared(escrow_obj);
+        };
+
         scenario.next_tx(MERCHANT);
         {
             let mut registry = test_scenario::take_shared<marketplace::MerchantRegistry>(&scenario);
@@ -4590,14 +4674,18 @@ module solzaar_sui::solzaar_sui_tests {
                 &scenario
             );
 
+        let mut escrow_obj = test_scenario::take_shared<escrow::Escrow>(&scenario);
+
         marketplace::withdraw_purchase_offer(
             &mut offer,
+            &mut escrow_obj,
             test_scenario::ctx(&mut scenario),
         );
 
         assert!(!marketplace::purchase_offer_active(&offer), 0);
 
         test_scenario::return_shared(offer);
+        test_scenario::return_shared(escrow_obj);
         clock::destroy_for_testing(clock);
         test_scenario::end(scenario);
     }
@@ -4622,12 +4710,16 @@ module solzaar_sui::solzaar_sui_tests {
                 &scenario
             );
 
+        let mut escrow_obj = test_scenario::take_shared<escrow::Escrow>(&scenario);
+
         marketplace::withdraw_purchase_offer(
             &mut offer,
+            &mut escrow_obj,
             test_scenario::ctx(&mut scenario),
         );
 
         test_scenario::return_shared(offer);
+        test_scenario::return_shared(escrow_obj);
         clock::destroy_for_testing(clock);
         test_scenario::end(scenario);
     }
@@ -4652,27 +4744,28 @@ module solzaar_sui::solzaar_sui_tests {
                 &scenario
             );
 
+        let mut escrow_obj = test_scenario::take_shared<escrow::Escrow>(&scenario);
+
         marketplace::withdraw_purchase_offer(
             &mut offer,
+            &mut escrow_obj,
             test_scenario::ctx(&mut scenario),
         );
 
         marketplace::withdraw_purchase_offer(
             &mut offer,
+            &mut escrow_obj,
             test_scenario::ctx(&mut scenario),
         );
 
         test_scenario::return_shared(offer);
+        test_scenario::return_shared(escrow_obj);
         clock::destroy_for_testing(clock);
         test_scenario::end(scenario);
     }
 
-    // Buyer cannot withdraw after seller rejects.
+    // Buyer can withdraw after seller rejects and receive a refund.
     #[test]
-    #[expected_failure(
-        abort_code = 36,
-        location = solzaar_sui::marketplace
-    )]
     fun test_purchase_offer_withdraw_after_reject() {
         let mut scenario = test_scenario::begin(MERCHANT);
         let clock = clock::create_for_testing(
@@ -4688,12 +4781,15 @@ module solzaar_sui::solzaar_sui_tests {
                     &scenario
                 );
 
+        let mut escrow_obj = test_scenario::take_shared<escrow::Escrow>(&scenario);
+
             marketplace::reject_purchase_offer(
                 &mut offer,
                 test_scenario::ctx(&mut scenario),
             );
 
             test_scenario::return_shared(offer);
+        test_scenario::return_shared(escrow_obj);
         };
 
         scenario.next_tx(BUYER);
@@ -4703,12 +4799,16 @@ module solzaar_sui::solzaar_sui_tests {
                 &scenario
             );
 
+        let mut escrow_obj = test_scenario::take_shared<escrow::Escrow>(&scenario);
+
         marketplace::withdraw_purchase_offer(
             &mut offer,
+            &mut escrow_obj,
             test_scenario::ctx(&mut scenario),
         );
 
         test_scenario::return_shared(offer);
+        test_scenario::return_shared(escrow_obj);
         clock::destroy_for_testing(clock);
         test_scenario::end(scenario);
     }
@@ -4734,12 +4834,16 @@ module solzaar_sui::solzaar_sui_tests {
                     &scenario
                 );
 
+        let mut escrow_obj = test_scenario::take_shared<escrow::Escrow>(&scenario);
+
             marketplace::withdraw_purchase_offer(
                 &mut offer,
+            &mut escrow_obj,
                 test_scenario::ctx(&mut scenario),
             );
 
             test_scenario::return_shared(offer);
+        test_scenario::return_shared(escrow_obj);
         };
 
         scenario.next_tx(MERCHANT);
@@ -4749,12 +4853,15 @@ module solzaar_sui::solzaar_sui_tests {
                 &scenario
             );
 
+        let mut escrow_obj = test_scenario::take_shared<escrow::Escrow>(&scenario);
+
         marketplace::reject_purchase_offer(
             &mut offer,
             test_scenario::ctx(&mut scenario),
         );
 
         test_scenario::return_shared(offer);
+        test_scenario::return_shared(escrow_obj);
         clock::destroy_for_testing(clock);
         test_scenario::end(scenario);
     }
@@ -4801,7 +4908,7 @@ module solzaar_sui::solzaar_sui_tests {
                 );
 
             assert!(
-                escrow::deposited_a(&escrow_obj) == 4_400_000_000u64,
+                escrow::deposited_a(&escrow_obj) == 880_000_000u64,
                 1
             );
 
@@ -4852,9 +4959,21 @@ module solzaar_sui::solzaar_sui_tests {
                 marketplace::PurchaseOffer
             >(&scenario);
 
-            let escrow_obj = test_scenario::take_shared<
+            let mut escrow_obj = test_scenario::take_shared<
                 escrow::Escrow
             >(&scenario);
+
+            let seller_coin = coin::mint_for_testing<SUI>(
+                80_000_000u64,
+                test_scenario::ctx(&mut scenario),
+            );
+            escrow::deposit(
+                &mut escrow_obj,
+                seller_coin,
+                &clock,
+                test_scenario::ctx(&mut scenario),
+            );
+            assert!(escrow::status(&escrow_obj) == 1u8, 990);
 
             marketplace::accept_purchase_offer(
                 &mut registry,
@@ -4921,9 +5040,21 @@ module solzaar_sui::solzaar_sui_tests {
                 marketplace::PurchaseOffer
             >(&scenario);
 
-            let escrow_obj = test_scenario::take_shared<
+            let mut escrow_obj = test_scenario::take_shared<
                 escrow::Escrow
             >(&scenario);
+
+            let seller_coin = coin::mint_for_testing<SUI>(
+                80_000_000u64,
+                test_scenario::ctx(&mut scenario),
+            );
+            escrow::deposit(
+                &mut escrow_obj,
+                seller_coin,
+                &clock,
+                test_scenario::ctx(&mut scenario),
+            );
+            assert!(escrow::status(&escrow_obj) == 1u8, 990);
 
             marketplace::accept_purchase_offer(
                 &mut registry,
@@ -4949,12 +5080,16 @@ module solzaar_sui::solzaar_sui_tests {
                 &scenario
             );
 
+        let mut escrow_obj = test_scenario::take_shared<escrow::Escrow>(&scenario);
+
         marketplace::withdraw_purchase_offer(
             &mut offer,
+            &mut escrow_obj,
             test_scenario::ctx(&mut scenario),
         );
 
         test_scenario::return_shared(offer);
+        test_scenario::return_shared(escrow_obj);
         clock::destroy_for_testing(clock);
         test_scenario::end(scenario);
     }
@@ -5064,16 +5199,12 @@ module solzaar_sui::solzaar_sui_tests {
 
             assert!(
                 escrow::vault_balance(&escrow_obj) ==
-                    4_400_000_000u64,
+                    880_000_000u64,
                 1
             );
 
             marketplace::withdraw_purchase_offer(
                 &mut offer,
-                test_scenario::ctx(&mut scenario),
-            );
-
-            escrow::withdraw_before_complete(
                 &mut escrow_obj,
                 test_scenario::ctx(&mut scenario),
             );

@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite --mode devnet",
     "dev-mainnet": "vite --mode mainnet",
+    "dev-devnet": "vite --mode devnet",
     "build": "vite build",
     "build-devnet": "vite build --mode devnet",
     "build-mainnet": "vite build --mode mainnet",
