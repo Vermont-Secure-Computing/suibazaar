@@ -2225,7 +2225,22 @@ module solzaar_sui::marketplace {
     // Create Buyer-Funded Purchase Offer
     // ============================================================
 
+    // Legacy API retained for compatible package upgrades.
+    // All new purchase offers must use create_purchase_offer_v2.
     public fun create_purchase_offer(
+        _merchant: &MerchantProfile,
+        _product: &Product,
+        _escrow_object: &Escrow,
+        _unit_price: u64,
+        _quantity: u32,
+        _clock: &Clock,
+        _ctx: &mut TxContext,
+    ) {
+        abort E_LEGACY_CHECKOUT_DISABLED
+    }
+
+    public fun create_purchase_offer_v2(
+        registry: &mut MerchantRegistry,
         merchant: &MerchantProfile,
         product: &Product,
         escrow_object: &Escrow,
@@ -2394,6 +2409,13 @@ module solzaar_sui::marketplace {
             escrow::required_deposit_b(escrow_object)
                 == security_deposit,
             E_INVALID_SELLER_DEPOSIT
+        );
+
+        // Reserve this escrow for exactly one marketplace checkout.
+        // Prevents duplicate PurchaseOffers and cross-checkout reuse.
+        bind_escrow(
+            registry,
+            object::id(escrow_object),
         );
 
         // --------------------------------------------------------
@@ -2655,7 +2677,11 @@ module solzaar_sui::marketplace {
         // Reserve product stock
         // --------------------------------------------------------
 
-        bind_escrow(registry, offer.escrow);
+        // The escrow must already be reserved by create_purchase_offer.
+        assert!(
+            dynamic_field::exists(&registry.id, offer.escrow),
+            E_PURCHASE_OFFER_ESCROW_MISMATCH
+        );
 
         product.stock = product.stock - offer.quantity;
         product.updated_at = now;
@@ -3004,4 +3030,5 @@ module solzaar_sui::marketplace {
             true,
         );
     }
+
 }

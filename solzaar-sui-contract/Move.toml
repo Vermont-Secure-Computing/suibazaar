@@ -6,4 +6,4 @@ edition = "2024"
 escrow = { local = "../../simple_sui_escrow/escrow_contract" }
 
 [environments]
-devnet = "adb8a128"
+devnet = "7df8eb39"

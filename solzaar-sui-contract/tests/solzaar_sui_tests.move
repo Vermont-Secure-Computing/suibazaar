@@ -3794,6 +3794,11 @@ module solzaar_sui::solzaar_sui_tests {
         scenario.next_tx(BUYER);
 
         {
+            let mut registry =
+                test_scenario::take_shared<
+                    marketplace::MerchantRegistry
+                >(&scenario);
+                
             let merchant =
                 test_scenario::take_shared<
                     marketplace::MerchantProfile
@@ -3809,14 +3814,13 @@ module solzaar_sui::solzaar_sui_tests {
                     escrow::Escrow
                 >(&scenario);
 
-            marketplace::create_purchase_offer(
+            marketplace::create_purchase_offer_v2(
+                &mut registry,
                 &merchant,
                 &product,
                 &escrow_obj,
-
                 800_000_000u64,
                 1u32,
-
                 &clock,
                 test_scenario::ctx(&mut scenario),
             );
@@ -3832,6 +3836,7 @@ module solzaar_sui::solzaar_sui_tests {
             test_scenario::return_shared(
                 escrow_obj
             );
+            test_scenario::return_shared(registry);
         };
 
         // ========================================================
@@ -4067,6 +4072,10 @@ module solzaar_sui::solzaar_sui_tests {
         scenario.next_tx(BUYER);
 
         {
+            let mut registry =
+                test_scenario::take_shared<
+                    marketplace::MerchantRegistry
+                >(scenario);
             let merchant =
                 test_scenario::take_shared<
                     marketplace::MerchantProfile
@@ -4082,7 +4091,8 @@ module solzaar_sui::solzaar_sui_tests {
                     escrow::Escrow
                 >(scenario);
 
-            marketplace::create_purchase_offer(
+            marketplace::create_purchase_offer_v2(
+                &mut registry,
                 &merchant,
                 &product,
                 &escrow_obj,
@@ -4095,6 +4105,7 @@ module solzaar_sui::solzaar_sui_tests {
             test_scenario::return_shared(merchant);
             test_scenario::return_shared(product);
             test_scenario::return_shared(escrow_obj);
+            test_scenario::return_shared(registry);
         };
     }
 
@@ -4452,15 +4463,41 @@ module solzaar_sui::solzaar_sui_tests {
         // Buyer can construct a valid discounted offer for that escrow,
         // even though it is already bound. Acceptance must reject reuse.
         scenario.next_tx(BUYER);
+
         {
-            let merchant = test_scenario::take_shared<marketplace::MerchantProfile>(&scenario);
-            let product = test_scenario::take_shared<marketplace::Product>(&scenario);
-            let escrow_obj = test_scenario::take_shared<escrow::Escrow>(&scenario);
-            marketplace::create_purchase_offer(
-                &merchant, &product, &escrow_obj,
-                1_000_000_000u64, 1u32,
-                &clock, test_scenario::ctx(&mut scenario),
+            let mut registry =
+                test_scenario::take_shared<
+                    marketplace::MerchantRegistry
+                >(&scenario);
+
+            let merchant =
+                test_scenario::take_shared<
+                    marketplace::MerchantProfile
+                >(&scenario);
+
+            let product =
+                test_scenario::take_shared<
+                    marketplace::Product
+                >(&scenario);
+
+            let escrow_obj =
+                test_scenario::take_shared<
+                    escrow::Escrow
+                >(&scenario);
+
+            // Must abort: escrow already bound to a regular order.
+            marketplace::create_purchase_offer_v2(
+                &mut registry,
+                &merchant,
+                &product,
+                &escrow_obj,
+                1_000_000_000u64,
+                1u32,
+                &clock,
+                test_scenario::ctx(&mut scenario),
             );
+
+            test_scenario::return_shared(registry);
             test_scenario::return_shared(merchant);
             test_scenario::return_shared(product);
             test_scenario::return_shared(escrow_obj);
@@ -5232,6 +5269,68 @@ module solzaar_sui::solzaar_sui_tests {
             test_scenario::return_shared(offer);
             test_scenario::return_shared(escrow_obj);
         };
+
+        clock::destroy_for_testing(clock);
+        test_scenario::end(scenario);
+    }
+
+    // SECURITY: One escrow cannot create two PurchaseOffers.
+    #[test]
+    #[expected_failure(
+        abort_code = 40,
+        location = solzaar_sui::marketplace
+    )]
+    fun test_security_same_escrow_two_purchase_offers_rejected() {
+        let mut scenario = test_scenario::begin(MERCHANT);
+
+        let clock = clock::create_for_testing(
+            test_scenario::ctx(&mut scenario)
+        );
+
+        // Creates the first funded PurchaseOffer.
+        // The escrow is now permanently registered.
+        setup_funded_purchase_offer(&mut scenario, &clock);
+
+        // Buyer attempts to reuse the same escrow.
+        scenario.next_tx(BUYER);
+
+        let mut registry =
+            test_scenario::take_shared<
+                marketplace::MerchantRegistry
+            >(&scenario);
+
+        let merchant =
+            test_scenario::take_shared<
+                marketplace::MerchantProfile
+            >(&scenario);
+
+        let product =
+            test_scenario::take_shared<
+                marketplace::Product
+            >(&scenario);
+
+        let escrow_obj =
+            test_scenario::take_shared<
+                escrow::Escrow
+            >(&scenario);
+
+        // Must abort with E_ESCROW_ALREADY_BOUND (40).
+        marketplace::create_purchase_offer_v2(
+                &mut registry,
+            &merchant,
+            &product,
+            &escrow_obj,
+            800_000_000u64,
+            1u32,
+            &clock,
+            test_scenario::ctx(&mut scenario),
+        );
+
+        // These lines must never execute.
+        test_scenario::return_shared(registry);
+        test_scenario::return_shared(merchant);
+        test_scenario::return_shared(product);
+        test_scenario::return_shared(escrow_obj);
 
         clock::destroy_for_testing(clock);
         test_scenario::end(scenario);
