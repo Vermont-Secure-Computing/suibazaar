@@ -309,6 +309,15 @@ module solzaar_sui::marketplace {
         buyer: address,
     }
 
+    public struct OfferEscrowBinding has store {
+        offer: ID,
+        product: ID,
+        buyer: address,
+        seller: address,
+        quantity: u32,
+        total_price: u64,
+    }
+
         // ============================================================
     // Buyer-Funded Purchase Offer
     // ============================================================
@@ -2411,12 +2420,6 @@ module solzaar_sui::marketplace {
             E_INVALID_SELLER_DEPOSIT
         );
 
-        // Reserve this escrow for exactly one marketplace checkout.
-        // Prevents duplicate PurchaseOffers and cross-checkout reuse.
-        bind_escrow(
-            registry,
-            object::id(escrow_object),
-        );
 
         // --------------------------------------------------------
         // Create PurchaseOffer
@@ -2447,6 +2450,27 @@ module solzaar_sui::marketplace {
 
         let offer_id =
             object::uid_to_inner(&offer.id);
+
+        assert!(
+            !dynamic_field::exists(
+                &registry.id,
+                object::id(escrow_object)
+            ),
+            E_ESCROW_ALREADY_BOUND
+        );
+
+        dynamic_field::add(
+            &mut registry.id,
+            object::id(escrow_object),
+            OfferEscrowBinding {
+                offer: offer_id,
+                product: object::id(product),
+                buyer,
+                seller,
+                quantity,
+                total_price,
+            },
+        );
 
         event::emit(PurchaseOfferCreated {
             offer_id,
@@ -2480,7 +2504,8 @@ module solzaar_sui::marketplace {
         merchant: &MerchantProfile,
         product: &mut Product,
         offer: &mut PurchaseOffer,
-        escrow_object: &Escrow,
+        escrow_object: &mut Escrow,
+        seller_bond: Coin<SUI>,
         clock: &Clock,
         ctx: &mut TxContext,
     ) {
@@ -2529,7 +2554,7 @@ module solzaar_sui::marketplace {
         // --------------------------------------------------------
 
         assert!(
-            escrow::status(escrow_object) == 1,
+            escrow::status(escrow_object) == 0,
             E_INVALID_ORDER_STATUS
         );
 
@@ -2611,7 +2636,7 @@ module solzaar_sui::marketplace {
         );
 
         assert!(
-            escrow::status(escrow_object) == 1,
+            escrow::status(escrow_object) == 0,
             E_INVALID_ORDER_STATUS
         );
 
@@ -2669,7 +2694,7 @@ module solzaar_sui::marketplace {
         );
 
         assert!(
-            escrow::deposited_b(escrow_object) == offer.security_deposit,
+            escrow::deposited_b(escrow_object) == 0,
             E_INVALID_SELLER_DEPOSIT
         );
 
@@ -2677,10 +2702,70 @@ module solzaar_sui::marketplace {
         // Reserve product stock
         // --------------------------------------------------------
 
-        // The escrow must already be reserved by create_purchase_offer.
+        // Verify exact escrow-to-offer binding.
         assert!(
             dynamic_field::exists(&registry.id, offer.escrow),
             E_PURCHASE_OFFER_ESCROW_MISMATCH
+        );
+
+        let binding = dynamic_field::borrow<ID, OfferEscrowBinding>(
+            &registry.id,
+            offer.escrow,
+        );
+
+        assert!(
+            binding.offer == object::id(offer),
+            E_PURCHASE_OFFER_ESCROW_MISMATCH
+        );
+
+        assert!(
+            binding.product == offer.product,
+            E_PURCHASE_OFFER_PRODUCT_MISMATCH
+        );
+
+        assert!(
+            binding.buyer == offer.buyer,
+            E_INVALID_ESCROW_PARTIES
+        );
+
+        assert!(
+            binding.seller == seller,
+            E_INVALID_ESCROW_PARTIES
+        );
+
+        assert!(
+            binding.quantity == offer.quantity,
+            E_INVALID_QUANTITY
+        );
+
+        assert!(
+            binding.total_price == offer.total_price,
+            E_INVALID_ORDER_AMOUNT
+        );
+
+        // Validate exact seller security bond.
+        assert!(
+            sui::coin::value(&seller_bond) == offer.security_deposit,
+            E_INVALID_SELLER_DEPOSIT
+        );
+
+        // Deposit seller bond atomically with acceptance.
+        escrow::deposit(
+            escrow_object,
+            seller_bond,
+            clock,
+            ctx
+        );
+
+        // Confirm both deposits are complete.
+        assert!(
+            escrow::status(escrow_object) == 1,
+            E_INVALID_ORDER_STATUS
+        );
+
+        assert!(
+            escrow::deposited_b(escrow_object) == offer.security_deposit,
+            E_INVALID_SELLER_DEPOSIT
         );
 
         product.stock = product.stock - offer.quantity;

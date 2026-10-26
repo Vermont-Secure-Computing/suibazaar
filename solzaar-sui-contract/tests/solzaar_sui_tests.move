@@ -3920,20 +3920,16 @@ module solzaar_sui::solzaar_sui_tests {
                 80_000_000u64,
                 test_scenario::ctx(&mut scenario),
             );
-            escrow::deposit(
-                &mut escrow_obj,
-                seller_coin,
-                &clock,
-                test_scenario::ctx(&mut scenario),
-            );
-            assert!(escrow::status(&escrow_obj) == 1u8, 990);
+
+            assert!(escrow::status(&escrow_obj) == 0u8, 990);
 
             marketplace::accept_purchase_offer(
                 &mut registry,
                 &merchant,
                 &mut product,
                 &mut offer,
-                &escrow_obj,
+                &mut escrow_obj,
+                seller_coin,
                 &clock,
                 test_scenario::ctx(&mut scenario),
             );
@@ -4147,16 +4143,22 @@ module solzaar_sui::solzaar_sui_tests {
                 marketplace::PurchaseOffer
             >(&scenario);
 
-            let escrow_obj = test_scenario::take_shared<
+            let mut escrow_obj = test_scenario::take_shared<
                 escrow::Escrow
             >(&scenario);
+
+            let seller_coin = coin::mint_for_testing<SUI>(
+                80_000_000u64,
+                test_scenario::ctx(&mut scenario),
+            );
 
             marketplace::accept_purchase_offer(
                 &mut registry,
                 &merchant,
                 &mut product,
                 &mut offer,
-                &escrow_obj,
+                &mut escrow_obj,
+                seller_coin,
                 &clock,
                 test_scenario::ctx(&mut scenario),
             );
@@ -4218,20 +4220,16 @@ module solzaar_sui::solzaar_sui_tests {
                 80_000_000u64,
                 test_scenario::ctx(&mut scenario),
             );
-            escrow::deposit(
-                &mut escrow_obj,
-                seller_coin,
-                &clock,
-                test_scenario::ctx(&mut scenario),
-            );
-            assert!(escrow::status(&escrow_obj) == 1u8, 990);
+
+            assert!(escrow::status(&escrow_obj) == 0u8, 990);
 
             marketplace::accept_purchase_offer(
                 &mut registry,
                 &merchant,
                 &mut product,
                 &mut offer,
-                &escrow_obj,
+                &mut escrow_obj,
+                seller_coin,
                 &clock,
                 test_scenario::ctx(&mut scenario),
             );
@@ -4293,20 +4291,16 @@ module solzaar_sui::solzaar_sui_tests {
                 80_000_000u64,
                 test_scenario::ctx(&mut scenario),
             );
-            escrow::deposit(
-                &mut escrow_obj,
-                seller_coin,
-                &clock,
-                test_scenario::ctx(&mut scenario),
-            );
-            assert!(escrow::status(&escrow_obj) == 1u8, 990);
+
+            assert!(escrow::status(&escrow_obj) == 0u8, 990);
 
             marketplace::accept_purchase_offer(
                 &mut registry,
                 &merchant,
                 &mut product,
                 &mut offer,
-                &escrow_obj,
+                &mut escrow_obj,
+                seller_coin,
                 &clock,
                 test_scenario::ctx(&mut scenario),
             );
@@ -4338,16 +4332,22 @@ module solzaar_sui::solzaar_sui_tests {
                 marketplace::PurchaseOffer
             >(&scenario);
 
-            let escrow_obj = test_scenario::take_shared<
+            let mut escrow_obj = test_scenario::take_shared<
                 escrow::Escrow
             >(&scenario);
+
+            let seller_coin = coin::mint_for_testing<SUI>(
+                80_000_000u64,
+                test_scenario::ctx(&mut scenario),
+            );
 
             marketplace::accept_purchase_offer(
                 &mut registry,
                 &merchant,
                 &mut product,
                 &mut offer,
-                &escrow_obj,
+                &mut escrow_obj,
+                seller_coin,
                 &clock,
                 test_scenario::ctx(&mut scenario),
             );
@@ -4503,30 +4503,21 @@ module solzaar_sui::solzaar_sui_tests {
             test_scenario::return_shared(escrow_obj);
         };
 
-        // Acceptance requires the escrow to be fully funded (status 1).
-        scenario.next_tx(MERCHANT);
-        {
-            let mut escrow_obj = test_scenario::take_shared<escrow::Escrow>(&scenario);
-            let seller_coin = coin::mint_for_testing<SUI>(
-                100_000_000u64, test_scenario::ctx(&mut scenario),
-            );
-            escrow::deposit(
-                &mut escrow_obj, seller_coin, &clock,
-                test_scenario::ctx(&mut scenario),
-            );
-            test_scenario::return_shared(escrow_obj);
-        };
-
+        // Seller bond is deposited atomically during offer acceptance.
         scenario.next_tx(MERCHANT);
         {
             let mut registry = test_scenario::take_shared<marketplace::MerchantRegistry>(&scenario);
             let merchant = test_scenario::take_shared<marketplace::MerchantProfile>(&scenario);
             let mut product = test_scenario::take_shared<marketplace::Product>(&scenario);
             let mut offer = test_scenario::take_shared<marketplace::PurchaseOffer>(&scenario);
-            let escrow_obj = test_scenario::take_shared<escrow::Escrow>(&scenario);
+            let mut escrow_obj = test_scenario::take_shared<escrow::Escrow>(&scenario);
+            let seller_coin = coin::mint_for_testing<SUI>(
+                100_000_000u64, test_scenario::ctx(&mut scenario),
+            );
             marketplace::accept_purchase_offer(
                 &mut registry, &merchant, &mut product, &mut offer,
-                &escrow_obj, &clock, test_scenario::ctx(&mut scenario),
+                &mut escrow_obj, seller_coin, &clock,
+                test_scenario::ctx(&mut scenario),
             );
             test_scenario::return_shared(registry);
             test_scenario::return_shared(merchant);
@@ -5004,20 +4995,16 @@ module solzaar_sui::solzaar_sui_tests {
                 80_000_000u64,
                 test_scenario::ctx(&mut scenario),
             );
-            escrow::deposit(
-                &mut escrow_obj,
-                seller_coin,
-                &clock,
-                test_scenario::ctx(&mut scenario),
-            );
-            assert!(escrow::status(&escrow_obj) == 1u8, 990);
+
+            assert!(escrow::status(&escrow_obj) == 0u8, 990);
 
             marketplace::accept_purchase_offer(
                 &mut registry,
                 &merchant,
                 &mut product,
                 &mut offer,
-                &escrow_obj,
+                &mut escrow_obj,
+                seller_coin,
                 &clock,
                 test_scenario::ctx(&mut scenario),
             );
@@ -5085,20 +5072,16 @@ module solzaar_sui::solzaar_sui_tests {
                 80_000_000u64,
                 test_scenario::ctx(&mut scenario),
             );
-            escrow::deposit(
-                &mut escrow_obj,
-                seller_coin,
-                &clock,
-                test_scenario::ctx(&mut scenario),
-            );
-            assert!(escrow::status(&escrow_obj) == 1u8, 990);
+
+            assert!(escrow::status(&escrow_obj) == 0u8, 990);
 
             marketplace::accept_purchase_offer(
                 &mut registry,
                 &merchant,
                 &mut product,
                 &mut offer,
-                &escrow_obj,
+                &mut escrow_obj,
+                seller_coin,
                 &clock,
                 test_scenario::ctx(&mut scenario),
             );
@@ -5184,22 +5167,27 @@ module solzaar_sui::solzaar_sui_tests {
                 marketplace::PurchaseOffer
             >(&scenario);
 
-            let escrow_obj = test_scenario::take_shared<
+            assert!(marketplace::purchase_offer_active(&offer), 2);
+
+            let mut escrow_obj = test_scenario::take_shared<
                 escrow::Escrow
             >(&scenario);
 
-            assert!(marketplace::purchase_offer_active(&offer), 2);
+            let seller_coin = coin::mint_for_testing<SUI>(
+                80_000_000u64,
+                test_scenario::ctx(&mut scenario),
+            );
 
             marketplace::accept_purchase_offer(
                 &mut registry,
                 &merchant,
                 &mut product,
                 &mut offer,
-                &escrow_obj,
+                &mut escrow_obj,
+                seller_coin,
                 &clock,
                 test_scenario::ctx(&mut scenario),
             );
-
             test_scenario::return_shared(merchant);
             test_scenario::return_shared(product);
             test_scenario::return_shared(offer);
@@ -5332,6 +5320,217 @@ module solzaar_sui::solzaar_sui_tests {
         test_scenario::return_shared(product);
         test_scenario::return_shared(escrow_obj);
 
+        clock::destroy_for_testing(clock);
+        test_scenario::end(scenario);
+    }
+
+
+    // Buy Now / mutual cancellation regression setup.
+    // Buyer funds a regular order, seller funds the remaining bond.
+    fun setup_funded_buy_now(
+        scenario: &mut test_scenario::Scenario,
+        clock: &Clock,
+    ) {
+        create_test_registry(scenario);
+        scenario.next_tx(MERCHANT);
+        create_test_merchant(scenario, clock);
+        scenario.next_tx(MERCHANT);
+        create_test_product(scenario, clock);
+        scenario.next_tx(BUYER);
+        create_test_escrow(scenario, clock);
+        scenario.next_tx(BUYER);
+        deposit_test_buyer(scenario, clock);
+        scenario.next_tx(BUYER);
+        {
+            let mut registry = test_scenario::take_shared<marketplace::MerchantRegistry>(scenario);
+            let merchant = test_scenario::take_shared<marketplace::MerchantProfile>(scenario);
+            let mut product = test_scenario::take_shared<marketplace::Product>(scenario);
+            let escrow_obj = test_scenario::take_shared<escrow::Escrow>(scenario);
+            marketplace::create_order_record_v2(
+                &mut registry, &merchant, &mut product, &escrow_obj,
+                1u32, clock, test_scenario::ctx(scenario),
+            );
+            assert!(marketplace::product_stock(&product) == 9u32, 6001);
+            test_scenario::return_shared(registry);
+            test_scenario::return_shared(merchant);
+            test_scenario::return_shared(product);
+            test_scenario::return_shared(escrow_obj);
+        };
+        scenario.next_tx(MERCHANT);
+        {
+            let mut escrow_obj = test_scenario::take_shared<escrow::Escrow>(scenario);
+            let seller_coin = coin::mint_for_testing<SUI>(
+                100_000_000u64, test_scenario::ctx(scenario),
+            );
+            escrow::deposit(&mut escrow_obj, seller_coin, clock, test_scenario::ctx(scenario));
+            assert!(escrow::status(&escrow_obj) == 1u8, 6002);
+            assert!(escrow::deposited_b(&escrow_obj) == 100_000_000u64, 6003);
+            test_scenario::return_shared(escrow_obj);
+        };
+    }
+
+    #[test]
+    fun test_buy_now_seller_deposit() {
+        let mut scenario = test_scenario::begin(MERCHANT);
+        let clock = clock::create_for_testing(test_scenario::ctx(&mut scenario));
+        setup_funded_buy_now(&mut scenario, &clock);
+        scenario.next_tx(MERCHANT);
+        {
+            let product = test_scenario::take_shared<marketplace::Product>(&scenario);
+            let order = test_scenario::take_shared<marketplace::OrderRecord>(&scenario);
+            let escrow_obj = test_scenario::take_shared<escrow::Escrow>(&scenario);
+            assert!(marketplace::product_stock(&product) == 9u32, 6010);
+            assert!(marketplace::order_security_deposit(&order) == 100_000_000u64, 6011);
+            assert!(escrow::status(&escrow_obj) == 1u8, 6012);
+            assert!(escrow::vault_balance(&escrow_obj) == 1_200_000_000u64, 6013);
+            test_scenario::return_shared(product);
+            test_scenario::return_shared(order);
+            test_scenario::return_shared(escrow_obj);
+        };
+        clock::destroy_for_testing(clock);
+        test_scenario::end(scenario);
+    }
+
+    #[test]
+    fun test_mutual_cancellation_success() {
+        let mut scenario = test_scenario::begin(MERCHANT);
+        let clock = clock::create_for_testing(test_scenario::ctx(&mut scenario));
+        setup_funded_buy_now(&mut scenario, &clock);
+        scenario.next_tx(BUYER);
+        {
+            let order = test_scenario::take_shared<marketplace::OrderRecord>(&scenario);
+            let mut escrow_obj = test_scenario::take_shared<escrow::Escrow>(&scenario);
+            marketplace::request_mutual_cancellation(
+                &order, &mut escrow_obj, b"Buyer and seller agree", test_scenario::ctx(&mut scenario),
+            );
+            assert!(escrow::status(&escrow_obj) == 2u8, 6020);
+            test_scenario::return_shared(order);
+            test_scenario::return_shared(escrow_obj);
+        };
+        scenario.next_tx(MERCHANT);
+        {
+            let mut product = test_scenario::take_shared<marketplace::Product>(&scenario);
+            let mut order = test_scenario::take_shared<marketplace::OrderRecord>(&scenario);
+            let mut escrow_obj = test_scenario::take_shared<escrow::Escrow>(&scenario);
+            marketplace::approve_mutual_cancellation(
+                &mut product, &mut order, &mut escrow_obj, &clock,
+                test_scenario::ctx(&mut scenario),
+            );
+            assert!(escrow::status(&escrow_obj) == 3u8, 6021);
+            assert!(escrow::vault_balance(&escrow_obj) == 0u64, 6022);
+            assert!(marketplace::product_stock(&product) == 10u32, 6023);
+            assert!(marketplace::order_stock_restored(&order), 6024);
+            assert!(!marketplace::order_completed_sale_recorded(&order), 6025);
+            test_scenario::return_shared(product);
+            test_scenario::return_shared(order);
+            test_scenario::return_shared(escrow_obj);
+        };
+        clock::destroy_for_testing(clock);
+        test_scenario::end(scenario);
+    }
+
+    #[test]
+    fun test_mutual_cancellation_declined() {
+        let mut scenario = test_scenario::begin(MERCHANT);
+        let clock = clock::create_for_testing(test_scenario::ctx(&mut scenario));
+        setup_funded_buy_now(&mut scenario, &clock);
+        scenario.next_tx(BUYER);
+        {
+            let order = test_scenario::take_shared<marketplace::OrderRecord>(&scenario);
+            let mut escrow_obj = test_scenario::take_shared<escrow::Escrow>(&scenario);
+            marketplace::request_mutual_cancellation(
+                &order, &mut escrow_obj, b"Please cancel", test_scenario::ctx(&mut scenario),
+            );
+            test_scenario::return_shared(order);
+            test_scenario::return_shared(escrow_obj);
+        };
+        scenario.next_tx(MERCHANT);
+        {
+            let order = test_scenario::take_shared<marketplace::OrderRecord>(&scenario);
+            let mut escrow_obj = test_scenario::take_shared<escrow::Escrow>(&scenario);
+            marketplace::decline_mutual_cancellation(
+                &order, &mut escrow_obj, test_scenario::ctx(&mut scenario),
+            );
+            assert!(escrow::status(&escrow_obj) == 1u8, 6030);
+            assert!(escrow::vault_balance(&escrow_obj) == 1_200_000_000u64, 6031);
+            test_scenario::return_shared(order);
+            test_scenario::return_shared(escrow_obj);
+        };
+        scenario.next_tx(BUYER);
+        {
+            let product = test_scenario::take_shared<marketplace::Product>(&scenario);
+            let order = test_scenario::take_shared<marketplace::OrderRecord>(&scenario);
+            assert!(marketplace::product_stock(&product) == 9u32, 6032);
+            assert!(!marketplace::order_stock_restored(&order), 6033);
+            test_scenario::return_shared(product);
+            test_scenario::return_shared(order);
+        };
+        clock::destroy_for_testing(clock);
+        test_scenario::end(scenario);
+    }
+
+    #[test]
+    #[expected_failure(abort_code = 16, location = solzaar_sui::marketplace)]
+    fun test_mutual_cancellation_double_approve() {
+        let mut scenario = test_scenario::begin(MERCHANT);
+        let clock = clock::create_for_testing(test_scenario::ctx(&mut scenario));
+        setup_funded_buy_now(&mut scenario, &clock);
+        scenario.next_tx(BUYER);
+        {
+            let order = test_scenario::take_shared<marketplace::OrderRecord>(&scenario);
+            let mut escrow_obj = test_scenario::take_shared<escrow::Escrow>(&scenario);
+            marketplace::request_mutual_cancellation(
+                &order, &mut escrow_obj, b"Cancel", test_scenario::ctx(&mut scenario),
+            );
+            test_scenario::return_shared(order);
+            test_scenario::return_shared(escrow_obj);
+        };
+        scenario.next_tx(MERCHANT);
+        {
+            let mut product = test_scenario::take_shared<marketplace::Product>(&scenario);
+            let mut order = test_scenario::take_shared<marketplace::OrderRecord>(&scenario);
+            let mut escrow_obj = test_scenario::take_shared<escrow::Escrow>(&scenario);
+            marketplace::approve_mutual_cancellation(
+                &mut product, &mut order, &mut escrow_obj, &clock,
+                test_scenario::ctx(&mut scenario),
+            );
+            test_scenario::return_shared(product);
+            test_scenario::return_shared(order);
+            test_scenario::return_shared(escrow_obj);
+        };
+        scenario.next_tx(MERCHANT);
+        {
+            let mut product = test_scenario::take_shared<marketplace::Product>(&scenario);
+            let mut order = test_scenario::take_shared<marketplace::OrderRecord>(&scenario);
+            let mut escrow_obj = test_scenario::take_shared<escrow::Escrow>(&scenario);
+            marketplace::approve_mutual_cancellation(
+                &mut product, &mut order, &mut escrow_obj, &clock,
+                test_scenario::ctx(&mut scenario),
+            );
+            test_scenario::return_shared(product);
+            test_scenario::return_shared(order);
+            test_scenario::return_shared(escrow_obj);
+        };
+        clock::destroy_for_testing(clock);
+        test_scenario::end(scenario);
+    }
+
+    #[test]
+    #[expected_failure]
+    fun test_mutual_cancellation_unauthorized() {
+        let mut scenario = test_scenario::begin(MERCHANT);
+        let clock = clock::create_for_testing(test_scenario::ctx(&mut scenario));
+        setup_funded_buy_now(&mut scenario, &clock);
+        scenario.next_tx(ATTACKER);
+        {
+            let order = test_scenario::take_shared<marketplace::OrderRecord>(&scenario);
+            let mut escrow_obj = test_scenario::take_shared<escrow::Escrow>(&scenario);
+            marketplace::request_mutual_cancellation(
+                &order, &mut escrow_obj, b"Unauthorized", test_scenario::ctx(&mut scenario),
+            );
+            test_scenario::return_shared(order);
+            test_scenario::return_shared(escrow_obj);
+        };
         clock::destroy_for_testing(clock);
         test_scenario::end(scenario);
     }
